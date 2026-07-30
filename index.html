@@ -1024,7 +1024,7 @@ function deliverCombo(combo) {
   }
   if (!nc) { msg('没有等待的顾客'); return; }
   G.carried = null;
-  combo.position.set(-4.5, 0.51, -9.3);
+  combo.position.set(-4.5, 0.51, -7.7);
   combo.rotation.set(0, 0, 0);
   combo.scale.set(1, 1, 1);
   msg('正在确认订单...', 2500);
@@ -1038,7 +1038,7 @@ function deliverCombo(combo) {
     });
     if (!checkOrder(savedNC.order, burgerRecipe, items)) {
       msg('顾客: "这不是我想要的"');
-      savedCombo.position.set(-4.5, 0.51, -9.3);
+      savedCombo.position.set(-4.5, 0.51, -7.7);
       coll(-5.0, -4.0, -9.0, -8.0, 'comboSolid');
       G.comboOnDesk = savedCombo;
       return;
