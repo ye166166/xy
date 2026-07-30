@@ -34,6 +34,11 @@ canvas{display:block}
 #dialogue-choices{display:none;gap:10px;margin-top:12px;flex-wrap:wrap}
 #dialogue-choices button{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#fff;padding:8px 18px;border-radius:8px;font-size:15px;cursor:pointer;transition:.2s}
 #dialogue-choices button:hover{background:rgba(255,215,0,0.2);border-color:#ffd700}
+#story-card{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:40;display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:36px}
+#day-hud{position:fixed;top:6px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.4);font-size:13px;z-index:5;pointer-events:none;display:none}
+#gameover-screen{position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center}
+#gameover-text{font-size:80px;font-weight:bold;color:#ff0000;text-shadow:0 0 30px rgba(255,0,0,0.8)}
+#gameover-sub{font-size:28px;color:#ccc;margin-top:20px}
 </style>
 </head>
 <body>
@@ -46,6 +51,9 @@ canvas{display:block}
 <div id="total-earnings">💰 累计收入: 0元</div>
 <div id="order-paper"><div class="order-title">📋 今日订单</div><div class="order-content" id="order-content"></div><div class="order-hint">按 T 切换显示</div></div>
 <div id="result-screen"><div id="result-text"></div><div id="result-money"></div><div id="result-sub">按空格开始下一单</div></div>
+<div id="story-card"><div>这是我入职的第一天</div></div>
+<div id="day-hud">第一天，店内仅有一位客人</div>
+<div id="gameover-screen"><div id="gameover-text">Game Over</div><div id="gameover-sub">专心烹饪</div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js">
 </script>
@@ -62,40 +70,42 @@ var chatReplies = {
   '推荐大份薯条': ['哈哈就想吃薯条！','光吃薯条不够，再加个汉堡吧']
 };
 
-function startDialogue() {
+function startDialogue(cust) {
   if (chatting) return;
-  chatCust = null;
-  // Find nearest customer capable of dialogue
-  var anyNear = null; var activeNear = null; var undialoguedNear = null;
-  for (var i = 0; i < G.customers.length; i++) {
-    if (G.customers[i].served) continue;
-    var d = G.camera.position.distanceTo(G.customers[i].group.position);
-    if (d >= 7.0) continue;
-    anyNear = G.customers[i];
-    if (G.activeCustomer && G.customers[i] === G.activeCustomer) { activeNear = G.customers[i]; }
-    if (!G.customers[i].dialogued) { undialoguedNear = G.customers[i]; }
+  if (cust) { chatCust = cust; } else {
+    chatCust = null;
+    var anyNear = null; var activeNear = null; var undialoguedNear = null;
+    for (var i = 0; i < G.customers.length; i++) {
+      if (G.customers[i].served && G.phase !== 'resting') continue;
+      var d = G.camera.position.distanceTo(new THREE.Vector3(G.customers[i].group.position.x, 0, G.customers[i].group.position.z));
+      if (d >= 7.0) continue;
+      anyNear = G.customers[i];
+      if (G.activeCustomer && G.customers[i] === G.activeCustomer) { activeNear = G.customers[i]; }
+      if (!G.customers[i].dialogued) { undialoguedNear = G.customers[i]; }
+    }
+    if (!anyNear) { msg('附近没有顾客'); return; }
+    if (G.activeCustomer && activeNear && !activeNear.served) { chatCust = activeNear; }
+    else if (anyNear.served) { chatCust = anyNear; }
+    else if (undialoguedNear) { chatCust = undialoguedNear; }
+    else { chatCust = anyNear; }
   }
-  if (!anyNear) { msg('附近没有顾客'); return; }
-  
-  if (G.activeCustomer && activeNear) { chatCust = activeNear; }
-  else if (undialoguedNear) { chatCust = undialoguedNear; }
-  else { chatCust = anyNear; }
   
   G.paused = true; chatting = true; chatStep = 0;
   document.getElementById('dialogue-box').style.display = 'block';
   document.getElementById('dialogue-speaker').textContent = '👤 顾客';
   document.getElementById('dialogue-choices').style.display = 'none';
 
-  if (G.activeCustomer && chatCust === G.activeCustomer) {
-    // Has order, talking to the order giver
+  if (chatCust.served) {
+    typewrite('有什么事吗？', function() { showChatChoices(); });
+  } else if (G.activeCustomer && chatCust === G.activeCustomer) {
     typewrite('你的订单还要多久啊？', function() { showBusyChoices(); });
-  } else if (G.activeCustomer && chatCust !== G.activeCustomer) {
-    // Has order, talking to a different customer
-    typewrite('你有什么事吗？', function() { showBusyChoices(); });
-  } else {
-    // Normal first-time chat
+  } else if (!chatCust.dialogued && chatCust.isOrdering) {
     var txt = chatLines[Math.floor(Math.random() * chatLines.length)];
     typewrite(txt, function() { setTimeout(function() { showChoices(); }, 500); });
+  } else if (!chatCust.dialogued) {
+    typewrite('有什么事吗？', function() { showChatChoices(); });
+  } else {
+    typewrite('你有什么事吗？', function() { showBusyChoices(); });
   }
 }
 
@@ -176,11 +186,63 @@ function selectChoice(choice) {
   });
 }
 
+var chatJokes = ['小白加小白等于什么？等于小白兔（小白two），好笑吧哈哈。','有一天火柴头浑身发痒，挠着挠着，自己把自己点着了。','海水为什么是蓝色的？因为小鱼一直在吐泡泡，布鲁布鲁（blue blue）。','从前有个人钓鱼，钓上来一只鱿鱼，鱿鱼苦苦哀求别烤了它，那人说行，考你几个问题就行，鱿鱼当场崩溃：别考别考！','你晓得布和纸最怕什么吗？不怕一万只怕万一，不（布）怕一万，只（纸）怕万一哟。','为什么大雁冬天要往南边飞？因为走过去太慢啦，当然要飞着走才行。','一颗玉米走在路上觉得太热，走着走着它就变成爆米花了。'];
+var chatLores = ['我听说这家店收留过不少弄丢过往的人，在这里安安稳稳过日子，比在外颠沛流离舒服太多了。','看你处理食材的动作干脆利落，下手精准又沉稳，寻常打工的店员可练不出这种本事。','这家老店看着平平无奇，背地里藏着不少没人知晓的秘密，尤其是店铺往后的位置，可不简单。','偶尔深夜路过店铺后面，总能隐约听见细碎动静，总觉得那片墙后面藏着东西。'];
+
+function showChatChoices() {
+  var container = document.getElementById('dialogue-choices');
+  container.innerHTML = '';
+  container.style.display = 'flex';
+  var opts = ['没\u4e8b','想和你闲聊一会'];
+  opts.forEach(function(op, idx) {
+    var btn = document.createElement('button');
+    btn.textContent = (idx+1) + '. ' + op;
+    btn.onclick = function() { selectChat(op); };
+    container.appendChild(btn);
+  });
+  document.addEventListener('keydown', onChatKey);
+}
+function onChatKey(e) {
+  var opts = ['没\u4e8b','想和你闲聊一会'];
+  var idx = parseInt(e.key) - 1;
+  if (idx >= 0 && idx < opts.length) { selectChat(opts[idx]); document.removeEventListener('keydown', onChatKey); }
+}
+function selectChat(op) {
+  document.getElementById('dialogue-choices').style.display = 'none';
+  document.removeEventListener('keydown', onChatKey);
+  if (op.indexOf('没事')>=0) { closeDialogue(); return; }
+  var r = Math.random();
+  if (r < 0.5) { typewrite('不了，我还有事。', function(){setTimeout(function(){closeDialogue();},600);}); }
+  else if (r < 0.8) { var joke = chatJokes[Math.floor(Math.random()*chatJokes.length)]; typewrite(joke, function(){setTimeout(function(){closeDialogue();},1200);}); }
+  else { var lore = chatLores[Math.floor(Math.random()*chatLores.length)]; typewrite(lore, function(){setTimeout(function(){closeDialogue();},1500);}); }
+}
+
+function endRestTime() {
+  G.restActive = false; G.restTimer = 0; G.day++;
+  document.getElementById('story-card').innerHTML = '<div style="font-size:50px">第' + G.day + '天</div>';
+  document.getElementById('story-card').style.display = 'flex';
+  setTimeout(function(){
+    document.getElementById('story-card').style.display='none';
+    document.getElementById('story-card').innerHTML = '<div>这是我入职的第一天</div>';
+    G.phase = 'waiting';
+    G.camera.position.set(0, 1.7, 4.5); G.yaw = 0; G.pitch = 0;
+    G.ass.bBot=0;G.ass.stk=0;G.ass.eg=0;G.ass.lt=0;G.ass.bTop=0;G.ass.sc=[];
+    if(G.ass.vis){G.scene.remove(G.ass.vis);G.ass.vis=null;}
+    if(G.tray.mesh){G.scene.remove(G.tray.mesh);G.tray.mesh=null;G.tray.placed=false;}
+    G.tray.slots.forEach(function(s,i){if(s){G.scene.remove(s);G.tray.slots[i]=null;}});
+    G.gSlots.forEach(function(s){if(s.m){G.scene.remove(s.m);s.m=0;s.o=0;s.s='e';s.ti=0;s.r=0;}});
+    G.fSlots.forEach(function(s){if(s.m){G.scene.remove(s.m);s.m=0;s.o=0;s.s='e';s.ti=0;s.r=0;}});
+    spawnCustomers();
+    G.activeCustomer = null;
+    document.getElementById('day-hud').textContent = '第一天，店内仅有一位客人';
+  }, 2500);
+}
+
 function closeDialogue() {
   document.getElementById('dialogue-box').style.display = 'none';
   G.paused = false;
   chatting = false;
-  if (chatCust && !chatCust.dialogued) {
+  if (chatCust && !chatCust.dialogued && chatCust.isOrdering) {
     chatCust.dialogued = true;
     G.activeCustomer = chatCust;
     G.order = chatCust.order;
@@ -209,6 +271,9 @@ var G = {
   comboOnDesk: null,
   paused: false, dialogueTarget: null,
   activeCustomer: null,
+  day: 1,
+  restTimer: 0,
+  restActive: false,
   doorPiv: null, divPiv: null,
   keys: {}, clock: null
 };
@@ -652,8 +717,34 @@ function startGame() {
       var k = e.key.toLowerCase();
       G.keys[k] = true;
 
-      if (k === ' ' && G.locked && G.phase === 'success') newRound();
+      if (k === ' ' && G.locked && G.restActive) { endRestTime(); return; }
       if (k === ' ' && G.locked && G.phase === 'playing') G.renderer.domElement.requestPointerLock();
+      if (k === 'r' && (G.phase === 'playing' || G.phase === 'waiting' || G.phase === 'resting')) {
+        // Customer dialogue - check nearest arrived customer
+        if (G.customers.length > 0) {
+          var nearC = null; var nearD = 999;
+          for (var ci5=0; ci5<G.customers.length; ci5++) {
+            var c5 = G.customers[ci5];
+            if (c5.arrived && !c5.served && c5.group) {
+              var d5 = G.camera.position.distanceTo(c5.group.position);
+              if (d5 < 4 && d5 < nearD) { nearC = c5; nearD = d5; }
+            }
+          }
+          if (nearC) { startDialogue(nearC); return; }
+        }
+      }
+      if (k === 'x' && !G.paused && (G.phase === 'waiting' || G.phase === 'playing' || G.phase === 'resting')) {
+        // X key: chat with any nearby customer
+        var xNear = null; var xDist = 999;
+        for (var xi=0; xi<G.customers.length; xi++) {
+          if (G.customers[xi].served && G.phase !== 'resting') continue;
+          if (!G.customers[xi].served && G.customers[xi].group) {
+            var xd = G.camera.position.distanceTo(G.customers[xi].group.position);
+            if (xd < 4 && xd < xDist) { xNear = G.customers[xi]; xDist = xd; }
+          }
+        }
+        if (xNear) { startDialogue(xNear); }
+      }
       if (k === 'r' && G.phase === 'playing') {
         var atPack = G.camera.position.distanceTo(new THREE.Vector3(5.5, 0, -0.5)) < 2.5;
         // Combine tray items into combo
@@ -693,7 +784,6 @@ function startGame() {
           }
         }
       }
-      if (k === 'x' && !G.paused && (G.phase === 'waiting' || G.phase === 'playing')) { startDialogue(); }
       if (k === 'q' && G.carried) { var isCombo = G.carried.userData.type === 'combo'; dropIt(); msg(isCombo ? '丢掉套餐' : '丢掉食材'); }
     });
 
@@ -702,9 +792,8 @@ function startGame() {
     document.addEventListener('pointerlockchange', function() {
       G.locked = document.pointerLockElement === G.renderer.domElement;
       if (G.locked && G.phase === 'ordering') {
-        G.phase = 'waiting';
-        spawnCustomers();
-        msg('→ 走到前台跟顾客对话接单', 3000);
+        document.getElementById('story-card').style.display = 'flex';
+        setTimeout(function(){document.getElementById('story-card').style.display='none';document.getElementById('day-hud').style.display='block';G.phase='waiting';spawnCustomers();msg('→ 走到前台跟顾客对话接单',3000);},3000);
       }
     });
 
@@ -815,6 +904,15 @@ function animate() {
     else if (s.ti >= 6 && !s.r) { s.s = 'ready'; s.r = 1; if (s.m && s.m.userData) s.m.userData.state = 'cooked'; if (s.m && s.m.type === 'Group') s.m.children.forEach(function(c) { if (c.isMesh) c.material = new THREE.MeshStandardMaterial({ color: 0xd4942b, roughness: 0.6 }); }); msg('薯条炸好了'); }
   });
 
+  // Rest timer countdown
+  if (G.restActive && G.restTimer > 0) {
+    G.restTimer -= dt;
+    var mins = Math.floor(G.restTimer / 60);
+    var secs = Math.floor(G.restTimer % 60);
+    document.getElementById('day-hud').textContent = '休息时间: ' + mins + ':' + (secs < 10 ? '0' : '') + secs;
+    if (G.restTimer <= 0) { endRestTime(); }
+  }
+
   // X key proximity hint (crosshair-based)
   if (!G.paused && (G.phase === 'waiting' || G.phase === 'playing')) {
     var hitsCrosshair = false;
@@ -828,28 +926,24 @@ function animate() {
     }
     document.getElementById('talk-hint').style.display = hitsCrosshair ? 'block' : 'none';
   }
-  // Slow customer movement
+  // Customer walk to destination
   if (!G.paused && G.customers.length > 0) {
     for (var ci=0; ci<G.customers.length; ci++) {
       var c = G.customers[ci];
-      if (!c.served && c.group) {
-        if (!c.moveDirX) c.moveDirX = (Math.random() - 0.5) * 0.8;
-        if (!c.moveDirZ) c.moveDirZ = (Math.random() - 0.5) * 0.8;
-        var nx = c.group.position.x + c.moveDirX * dt * 1.5;
-        var nz = c.group.position.z + c.moveDirZ * dt * 1.5;
-        // Keep out of kitchen (z > -6.1 means inside kitchen)
-        if (nz > -6.1 || nz < -30 || nx < -11 || nx > 11) { c.moveDirX = -c.moveDirX; c.moveDirZ = -c.moveDirZ; }
-        else {
-          // Remove own collision, check, re-add
-          collRemove('cust'+ci);
-          var canGo = canMove(nx, nz, 0.4);
-          coll(c.group.position.x-0.4, c.group.position.x+0.4, c.group.position.z-0.3, c.group.position.z+0.3, 'cust'+ci);
-          if (!canGo) { c.moveDirX = -c.moveDirX; c.moveDirZ = -c.moveDirZ; }
-          else { c.group.position.x = nx; c.group.position.z = nz; }
-        }
-        // Update collision
-        collRemove('cust'+ci);
-        coll(c.group.position.x-0.4, c.group.position.x+0.4, c.group.position.z-0.3, c.group.position.z+0.3, 'cust'+ci);
+      if (!c.served && c.group && !c.arrived) {
+        var dx = c.destX - c.group.position.x;
+        var dz = c.destZ - c.group.position.z;
+        var dist = Math.sqrt(dx*dx + dz*dz);
+        if (dist < 0.3) {
+          c.group.position.set(c.destX, 0, c.destZ); c.arrived = true;
+          if (!c.exclam && c.isOrdering) {
+            var excCanvas=document.createElement('canvas');excCanvas.width=128;excCanvas.height=128;
+            var excCtx=excCanvas.getContext('2d');excCtx.fillStyle='#ff0000';excCtx.font='bold 100px Arial';excCtx.textAlign='center';excCtx.fillText('!',64,100);
+            var excTex=new THREE.CanvasTexture(excCanvas);
+            var excSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:excTex,transparent:true,depthTest:false,depthWrite:false}));
+            excSprite.position.set(c.group.position.x,3.0,c.group.position.z);excSprite.scale.set(1.0,1.0,1);c.exclam=excSprite;G.scene.add(excSprite);
+          }
+        } else { var spd=1.5*dt; c.group.position.x+=(dx/dist)*spd; c.group.position.z+=(dz/dist)*spd; }
       }
     }
   }
@@ -1283,10 +1377,9 @@ function deliverCombo(combo) {
       else if (c.type === 'cola' || c.type === 'sprite') items.push(c.type);
     });
     if (!checkOrder(savedNC.order, burgerRecipe, items)) {
-      msg('顾客: "这不是我想要的"');
-      savedCombo.position.set(-4.5, 0.51, -7.7);
-      coll(-5.0, -4.0, -9.0, -8.0, 'comboSolid');
-      G.comboOnDesk = savedCombo;
+      document.getElementById('gameover-screen').style.display = 'flex';
+      G.paused = true;
+      setTimeout(function(){ location.reload(); }, 4000);
       return;
     }
     // Success!
@@ -1294,10 +1387,46 @@ function deliverCombo(combo) {
     savedNC.served = true; hidePaper(); G.phase = 'delivering';
     var w = createWaiter(); w.position.set(savedNC.x, 0, -6.5); G.scene.add(w); G.waiter = w;
     var price = calcPrice(savedNC.order); showResult(true, price); G.phase = 'success';
+    // Remove exclamation
+    if (savedNC.exclam) { G.scene.remove(savedNC.exclam); savedNC.exclam = null; }
+    // Don't remove customer - they stay to chat
     setTimeout(function() { G.scene.remove(w); G.waiter = null; }, 1500);
     setTimeout(function() {
-      G.scene.remove(savedNC.group); savedNC.group = null;
-      spawnCustomers(); G.phase = 'waiting'; hideResult(); msg('新顾客来了', 3000);
+      hideResult();
+      // Check if all ordering customers are served
+      var allServed = true;
+      for (var si=0; si<G.customers.length; si++) {
+        if (G.customers[si].isOrdering && !G.customers[si].served) { allServed = false; break; }
+      }
+      if (allServed) {
+        if (G.day >= 2) {
+          G.phase = 'resting'; G.restActive = true; G.restTimer = 180;
+          document.getElementById('day-hud').style.display = 'block';
+          document.getElementById('day-hud').textContent = '休息时间: 3:00';
+          msg('休息时间开始，可以自由闲聊', 3000);
+        } else {
+          G.day++;
+          document.getElementById('story-card').innerHTML = '<div style="font-size:50px">第' + G.day + '天</div>';
+          document.getElementById('story-card').style.display = 'flex';
+          setTimeout(function(){
+            document.getElementById('story-card').style.display='none';
+            document.getElementById('story-card').innerHTML = '<div>这是我入职的第一天</div>';
+            G.phase = 'waiting';
+            G.camera.position.set(0, 1.7, 4.5); G.yaw = 0; G.pitch = 0;
+            G.ass.bBot=0;G.ass.stk=0;G.ass.eg=0;G.ass.lt=0;G.ass.bTop=0;G.ass.sc=[];
+            if(G.ass.vis){G.scene.remove(G.ass.vis);G.ass.vis=null;}
+            if(G.tray.mesh){G.scene.remove(G.tray.mesh);G.tray.mesh=null;G.tray.placed=false;}
+            G.tray.slots.forEach(function(s,i){if(s){G.scene.remove(s);G.tray.slots[i]=null;}});
+            G.gSlots.forEach(function(s){if(s.m){G.scene.remove(s.m);s.m=0;s.o=0;s.s='e';s.ti=0;s.r=0;}});
+            G.fSlots.forEach(function(s){if(s.m){G.scene.remove(s.m);s.m=0;s.o=0;s.s='e';s.ti=0;s.r=0;}});
+            spawnCustomers();
+            G.activeCustomer = null;
+          }, 2500);
+        }
+      } else {
+        G.phase = 'playing';
+        msg('还有顾客需要服务', 2000);
+      }
     }, 4500);
   }, 2000);
 }
@@ -1327,11 +1456,15 @@ var custColors = [0xff6b6b, 0x6bc5ff, 0xffd93d, 0xa8e6cf, 0xdda0dd, 0xff9f43, 0x
 function spawnCustomers() {
   G.customers.forEach(function(c) { if (c.group) { G.scene.remove(c.group); c.group = null; } });
   G.customers = [];
-  var count = 5;
+  var orderCount = G.day === 1 ? 1 : 2;
+  var totalCount = 6;
   var shuffledColors = custColors.slice().sort(function(){return Math.random()-0.5;});
-  for (var ci = 0; ci < count; ci++) {
-    var cx = (Math.random() - 0.5) * 16;
-    var cz = -10 - Math.random() * 18;
+  var xPositions = [-10, -6, -2, 2, 6, 10];
+  var xBase = [-10, -6, -2, 2, 6, 10];
+  for (var ci = 0; ci < totalCount; ci++) {
+    var isOrdering = ci < orderCount;
+    var cx = isOrdering ? xBase[ci] + 10 : xBase[ci];
+    var cz = -15 - (ci % 3) * 4;
     var g = new THREE.Group();
     var hc = shuffledColors[ci % shuffledColors.length];
     var body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.5, 8), new THREE.MeshStandardMaterial({ color: hc, roughness: 0.7 }));
@@ -1367,14 +1500,16 @@ function spawnCustomers() {
     while (tot > 6 && order.drinks.length) { order.drinks.pop(); tot--; }
     while (tot > 6 && order.fries) { order.fries--; tot--; }
 
-    var cust = { group: g, order: order, served: false, dialogued: false, x: cx, talked: false };
+    var cust = { group: g, order: order, served: false, dialogued: false, x: cx, talked: false,
+      destX: cx, destZ: isOrdering ? -10.5 : cz,
+      arrived: false, exclam: null, isOrdering: isOrdering };
     var zone = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.6), new THREE.MeshBasicMaterial({ visible: false }));
     zone.position.y = 0.75;
     zone.userData = { isInteractable: true, isCustomer: true, custIdx: ci };
     g.add(zone);
     G.zones.push(zone);
     G.customers.push(cust);
-    sol(cx-0.4, cx+0.4, cz-0.4, cz+0.4, 'cust'+ci);
+    coll(cx-0.4, cx+0.4, cz-0.4, cz+0.4, 'cust'+ci);
   }
   msg('走到前台跟顾客对话接单', 3000);
 }
