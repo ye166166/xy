@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Steam Chef Simulator</title>
+<style>
+*{margin:0;padding:0;overflow:hidden}
+body{background:#000;font-family:Arial,sans-serif}
+canvas{display:block}
+#blocker{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10;cursor:pointer}
+#blocker.hidden{display:none}
+#instructions{color:#fff;font-size:26px;text-align:center;background:rgba(0,0,0,0.5);padding:30px 50px;border-radius:12px;line-height:1.8}
+#instructions small{font-size:15px;color:#aaa}
+#message{position:fixed;top:8%;left:50%;transform:translateX(-50%);color:#fff;font-size:30px;font-weight:bold;text-shadow:2px 2px 4px rgba(0,0,0,0.8);z-index:5;pointer-events:none;transition:opacity .3s;opacity:0}
+#message.show{opacity:1}
+#crosshair{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:26px;font-weight:bold;text-shadow:1px 1px 2px rgba(0,0,0,0.5);z-index:5;pointer-events:none}
+#hint{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.35);font-size:12px;z-index:5;pointer-events:none;text-align:center}
+#total-earnings{position:fixed;top:18px;right:20px;color:#ffd700;font-size:22px;font-weight:bold;z-index:5;pointer-events:none;text-shadow:2px 2px 4px rgba(0,0,0,0.6)}
+#order-paper{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(245,235,200,0.95);color:#333;padding:30px 40px;border-radius:16px;z-index:20;display:none;min-width:320px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.5)}
+.order-title{font-size:28px;font-weight:bold;margin-bottom:20px}
+.order-content{font-size:20px;line-height:2.2;text-align:left}
+.order-hint{font-size:16px;color:#888;margin-top:20px}
+#result-screen{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:25}
+#result-text{font-size:64px;font-weight:bold;color:#4caf50;text-shadow:2px 2px 8px rgba(0,0,0,0.5)}
+#result-money{font-size:42px;color:#ffd700;margin-top:15px;text-shadow:2px 2px 4px rgba(0,0,0,0.5)}
+#result-sub{font-size:18px;color:#aaa;margin-top:25px}
+</style>
+</head>
+<body>
+<div id="blocker"><div id="instructions">🍔 Steam Chef Simulator<br><small>点击或按空格进入游戏</small><br><br>WASD 移动 · 鼠标旋转 · 左键交互 · 右键丢弃</div></div>
+<div id="message"></div>
+<div id="crosshair">+</div>
+<div id="hint">WASD 行走 · 左键操作 · 右键丢食材 · 空格锁定鼠标</div>
+<div id="total-earnings">💰 累计收入: 0元</div>
+<div id="order-paper"><div class="order-title">📋 今日订单</div><div class="order-content" id="order-content"></div><div class="order-hint">按 T 切换显示</div></div>
+<div id="result-screen"><div id="result-text"></div><div id="result-money"></div><div id="result-sub">按空格开始下一单</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+
+// ===== GLOBALS =====
+var G = {
+  init: false, phase: 'ordering',
+  scene: null, camera: null, renderer: null,
+  locked: false, carried: null,
+  yaw: 0, pitch: 0, speed: 4.5,
+  order: null, waiter: null, money: 0,
+  customers: [],
+  ass: { bBot:0, stk:0, eg:0, lt:0, bTop:0, sc:[], vis:null },
+  boxes: [], zones: [], loose: [], drops: [],
+  tray: { placed:false, mesh:null, slots:[null,null,null,null,null,null] },
+  gSlots: [], fSlots: [],
+  prepIdx: 0,
+  bOpen: false, dOpen: false,
+  comboOnDesk: null,
+  doorPiv: null, divPiv: null,
+  keys: {}, clock: null
+};
+var slotPos = [[-0.7,0.53,-0.9],[0.7,0.53,-0.9],[-0.7,0.53,0],[0.7,0.53,0],[-0.7,0.53,0.9],[0.7,0.53,0.9]];
+var msgEl = document.getElementById('message'), msgTimer = null;
+
+function msg(text, dur) {
+  if (!dur) dur = 2000;
+  msgEl.textContent = text;
+  msgEl.classList.add('show');
+  if (msgTimer) clearTimeout(msgTimer);
+  msgTimer = setTimeout(function() { msgEl.classList.remove('show'); }, dur);
+}
+
+function coll(minX, maxX, minZ, maxZ, key) {
+  G.boxes.push({ minX: minX, maxX: maxX, minZ: minZ, maxZ: maxZ, key: key || null });
+}
+
+function collRemove(key) {
+  for (var i = G.boxes.length - 1; i >= 0; i--) {
+    if (G.boxes[i].key === key) G.boxes.splice(i, 1);
+  }
+}
+
+function canMove(x, z, r) {
+  for (var i = 0; i < G.boxes.length; i++) {
+    var b = G.boxes[i];
+    if (b.key && !window[b.key]) continue;
+    if (x + r > b.minX && x - r < b.maxX && z + r > b.minZ && z - r < b.maxZ) return false;
+  }
+  return true;
+}
+
+function mkZone(parent, w, h, d, oy) {
+   var z = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 }));
+  z.position.y = oy;
+  z.userData.isInteractable = true;
+  parent.add(z);
+  G.zones.push(z);
+  return z;
+}
+
+function mkCount(parent, w, d, c) {
+  var m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.5, d), new THREE.MeshStandardMaterial({ color: c || 0x888888, roughness: 0.7 }));
+  m.position.y = 0.25;
+  m.castShadow = true;
+  parent.add(m);
+  return m;
+}
+
+function pickUp(m) {
+  if (G.carried) { msg('先丢掉手里的东西'); return false; }
+  G.carried = m;
+  m.userData.canPickup = 0;
+  var idx = G.loose.indexOf(m);
+  if (idx >= 0) G.loose.splice(idx, 1);
+  var names = { steak: '生牛排', fries: '薯条', egg: '鸡蛋', lettuce: '生菜', bun: '面包', ketchup: '番茄酱', mustard: '芥末酱', cola: '可乐', sprite: '雪碧', burger: '汉堡', tray: '托盘', combo: '套餐' };
+  msg('拿起' + (names[m.userData.type] || '食材'));
+  return true;
+}
+
+function dropIt() {
+  if (!G.carried) return;
+  var dir = new THREE.Vector3(0, 0, -1).applyQuaternion(G.camera.quaternion);
+  var pos = G.camera.position.clone().add(dir.clone().multiplyScalar(1.2));
+  pos.y = Math.max(0.1, pos.y);
+  for (var i = 0; i < G.boxes.length; i++) {
+    var bx = G.boxes[i];
+    if (bx.key && !window[bx.key]) continue;
+    if (pos.x + 0.2 > bx.minX && pos.x - 0.2 < bx.maxX && pos.z + 0.2 > bx.minZ && pos.z - 0.2 < bx.maxZ) {
+      msg('这里有东西挡住了'); G.carried.userData.canPickup = 1; return;
+    }
+  }
+  G.carried.position.copy(pos);
+  G.carried.userData.canPickup = 1;
+  if (G.loose.indexOf(G.carried) < 0) G.loose.push(G.carried);
+  G.drops.push({ m: G.carried, v: new THREE.Vector3(dir.x * 1.2 + (Math.random() - 0.5) * 0.5, 1.2, dir.z * 1.2 + (Math.random() - 0.5) * 0.5), l: 60 });
+  G.carried = null;
+}
+
+// ===== ENTER GAME =====
+document.getElementById('blocker').addEventListener('click', startGame);
+document.addEventListener('keydown', function(e) {
+  if (e.key === ' ' && !G.init) { e.preventDefault(); startGame(); }
+});
+
+function startGame() {
+  if (G.init) return;
+  G.init = true;
+  document.getElementById('blocker').classList.add('hidden');
+
+  try {
+    // Scene setup
+    G.scene = new THREE.Scene();
+    G.scene.background = new THREE.Color(0x555555);
+    G.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 30);
+    G.camera.position.set(0, 1.7, 4.5);
+    G.renderer = new THREE.WebGLRenderer({ antialias: true });
+    G.renderer.setSize(window.innerWidth, window.innerHeight);
+    G.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    G.renderer.shadowMap.enabled = true;
+    G.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.prepend(G.renderer.domElement);
+    G.clock = new THREE.Clock();
+
+    var S = G.scene, cam = G.camera;
+
+    // Lights
+    S.add(new THREE.AmbientLight(0x444466, 0.6));
+    var dl = new THREE.DirectionalLight(0xffeedd, 1.2);
+    dl.position.set(5, 12, 5);
+    dl.castShadow = true;
+    dl.shadow.mapSize.width = 1024;
+    dl.shadow.mapSize.height = 1024;
+    dl.shadow.camera.near = 0.1; dl.shadow.camera.far = 25;
+    dl.shadow.camera.left = -8; dl.shadow.camera.right = 8;
+    dl.shadow.camera.top = 8; dl.shadow.camera.bottom = -8;
+    S.add(dl);
+    var fl2 = new THREE.DirectionalLight(0x8888ff, 0.3);
+    fl2.position.set(-3, 6, -3);
+    S.add(fl2);
+
+    // Wood floor
+    var wc = document.createElement('canvas');
+    wc.width = 512; wc.height = 512;
+    var wcx = wc.getContext('2d');
+    wcx.fillStyle = '#a87d4a';
+    wcx.fillRect(0, 0, 512, 512);
+    for (var i = 0; i < 60; i++) {
+      var y = Math.random() * 512;
+      wcx.strokeStyle = 'rgba(70,50,20,' + (0.08 + Math.random() * 0.15) + ')';
+      wcx.lineWidth = 1 + Math.random() * 2;
+      wcx.beginPath();
+      wcx.moveTo(0, y);
+      for (var x = 0; x < 512; x += 8) wcx.lineTo(x, y + Math.sin(x * 0.04) * 4 + (Math.random() - 0.5) * 3);
+      wcx.stroke();
+    }
+    var wt = new THREE.CanvasTexture(wc);
+    wt.wrapS = THREE.RepeatWrapping;
+    wt.wrapT = THREE.RepeatWrapping;
+    wt.repeat.set(6, 6);
+    var floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 36), new THREE.MeshStandardMaterial({ map: wt, roughness: 0.7, metalness: 0 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.z = -13;
+    floor.receiveShadow = true;
+    S.add(floor);
+
+    // Walls
+    var WM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
+    function addWall(w, d, x, z) { var m = new THREE.Mesh(new THREE.BoxGeometry(w, 4, d), WM); m.position.set(x, 2, z); S.add(m); }
+    // Back wall: center curtain gap only, sides open
+    addWall(7.53, 0.2, -4.335, -6.1);
+    addWall(7.53, 0.2, 4.335, -6.1);
+    addWall(0.2, 12.2, -8.1, 0);
+    addWall(0.2, 12.2, 8.1, 0);
+    addWall(24, 0.2, 0, 5);
+    addWall(24, 0.2, 0, -31.1);
+    addWall(0.2, 36.2, -12.1, -13);
+    addWall(0.2, 36.2, 12.1, -13);
+
+    // Wall colliders
+    coll(-8.1, -0.57, -6.25, -5.95);
+    coll(0.57, 8.1, -6.25, -5.95);
+    coll(-8.2, -8.0, -6.2, 6);
+    coll(8.0, 8.2, -6.2, 6);
+    coll(-12.2, 12.2, 4.85, 5.15);
+    coll(-12.2, 12.2, -31.25, -30.95);
+    coll(-12.25, -12.0, -31.2, 5.2);
+    coll(12.0, 12.25, -31.2, 5.2);
+
+    // Curtain
+    var cc = document.createElement('canvas');
+    cc.width = 64; cc.height = 64;
+    var cctx = cc.getContext('2d');
+    for (var cx = 0; cx < 8; cx++) for (var cy = 0; cy < 8; cy++) {
+      cctx.fillStyle = (cx + cy) % 2 === 0 ? '#aaaaaa' : '#f5f5f5';
+      cctx.fillRect(cx * 8, cy * 8, 8, 8);
+    }
+    var ctex = new THREE.CanvasTexture(cc);
+    var curtain = new THREE.Mesh(new THREE.BoxGeometry(1.14, 3.4, 0.02), new THREE.MeshStandardMaterial({ map: ctex, transparent: true, opacity: 0.65, side: THREE.DoubleSide, roughness: 0.9 }));
+    curtain.position.set(0, 2.3, -5.95);
+    S.add(curtain);
+
+    // Ceiling
+    var mc = document.createElement('canvas');
+    mc.width = 512; mc.height = 512;
+    var mctx = mc.getContext('2d');
+    mctx.fillStyle = '#e8e4e0';
+    mctx.fillRect(0, 0, 512, 512);
+    for (var i = 0; i < 40; i++) {
+      mctx.strokeStyle = 'rgba(180,175,170,' + (0.05 + Math.random() * 0.12) + ')';
+      mctx.lineWidth = 1 + Math.random() * 3;
+      mctx.beginPath();
+      var mx = Math.random() * 512;
+      mctx.moveTo(mx, 0);
+      for (var j = 0; j < 512; j += 20) mctx.lineTo(mx + Math.sin(j * 0.02) * (10 + Math.random() * 20) + Math.random() * 5, j);
+      mctx.stroke();
+    }
+    for (var i = 0; i < 20; i++) {
+      mctx.strokeStyle = 'rgba(200,195,190,' + (0.03 + Math.random() * 0.08) + ')';
+      mctx.lineWidth = 3 + Math.random() * 5;
+      mctx.beginPath();
+      var mx2 = Math.random() * 512;
+      mctx.moveTo(mx2, 0);
+      for (var j = 0; j < 512; j += 10) mctx.lineTo(mx2 + Math.sin(j * 0.015) * (15 + Math.random() * 30), j);
+      mctx.stroke();
+    }
+    var mtex = new THREE.CanvasTexture(mc);
+    mtex.wrapS = THREE.RepeatWrapping;
+    mtex.wrapT = THREE.RepeatWrapping;
+    mtex.repeat.set(3, 4);
+    var ceiling = new THREE.Mesh(new THREE.BoxGeometry(24, 0.12, 36), new THREE.MeshStandardMaterial({ map: mtex, roughness: 0.4, metalness: 0.1 }));
+    ceiling.position.set(0, 4, -13);
+    S.add(ceiling);
+
+    // Ceiling light
+    var cord = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.8), new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5 }));
+    cord.position.set(0, 3.6, 0);
+    S.add(cord);
+    var shade = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.35, 0.25, 12), new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.7, metalness: 0.3 }));
+    shade.position.set(0, 3.15, 0);
+    S.add(shade);
+    var bulb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffeeaa, emissive: 0xffdd88, emissiveIntensity: 0.8 }));
+    bulb.position.set(0, 3.05, 0);
+    S.add(bulb);
+    var pl = new THREE.PointLight(0xffdd88, 0.6, 6);
+    pl.position.set(0, 3, 0);
+    S.add(pl);
+
+    // Materials
+    var mD = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
+    var mB = new THREE.MeshStandardMaterial({ color: 0xd4a047, roughness: 0.7 });
+    var mSR = new THREE.MeshStandardMaterial({ color: 0xcc3333, roughness: 0.9 });
+    var mSC = new THREE.MeshStandardMaterial({ color: 0x6b3a1f, roughness: 0.8 });
+    var mFR = new THREE.MeshStandardMaterial({ color: 0xf5e6a3, roughness: 0.7 });
+    var mFC = new THREE.MeshStandardMaterial({ color: 0xd4942b, roughness: 0.6 });
+    var mER = new THREE.MeshStandardMaterial({ color: 0xf5deb3, roughness: 0.5 });
+    var mEC = new THREE.MeshStandardMaterial({ color: 0xfff8dc, roughness: 0.5 });
+    var mEY = new THREE.MeshStandardMaterial({ color: 0xffa500, roughness: 0.3 });
+    var mLT = new THREE.MeshStandardMaterial({ color: 0x4a8c3f, roughness: 0.8 });
+    var woods = new THREE.MeshStandardMaterial({ color: 0x8B5E3C, roughness: 0.9 });
+
+    function cab(x, z, label) {
+      var g = new THREE.Group();
+      g.position.set(x, 0, z);
+      mkCount(g, 0.7, 0.6, 0x8B5E3C);
+      var bd = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.65, 0.5), woods);
+      bd.position.y = 0.6;
+      g.add(bd);
+      if (label) { label.position.set(0.36, 0.65, 0); label.rotation.y = -Math.PI / 2; g.add(label); }
+      S.add(g);
+      mkZone(g, 0.7, 0.7, 0.6, 0.5);
+      coll(x - 0.4, x + 0.4, z - 0.35, z + 0.35);
+      return g;
+    }
+
+    var cabSteak = cab(-6.5, -4, new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.04, 0.04), mSR));
+    var cabEgg = cab(-6.5, -2.8, new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), mER));
+    var cabLett = cab(-6.5, -1.6, (function() { var m = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), mLT); m.scale.set(1.3, 0.5, 0.9); return m; })());
+    var cabFries = cab(-6.5, -0.4, new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.14, 0.04), mFR));
+    var cabBB = cab(-6.5, 0.8, (function() { var g = new THREE.Group(); var d = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), mB); d.scale.y = 0.5; g.add(d); return g; })());
+    var cabTB = cab(-6.5, 2, (function() { var g = new THREE.Group(); var b = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.09, 0.02, 12), mB); g.add(b); var d = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), mB); d.position.y = 0.02; g.add(d); return g; })());
+
+    // Cooler  
+    var fg = new THREE.Group(); fg.position.set(-6.5, 0, 3.2);
+    var cm = new THREE.MeshStandardMaterial({ color: 0x4477bb, roughness: 0.4 });
+    var base = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.06, 0.7), cm); base.position.y = 0.03; fg.add(base);
+    [-0.34, 0.34].forEach(function(z) { var w = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.28, 0.04), cm); w.position.set(0, 0.17, z); fg.add(w); });
+    [-0.43, 0.43].forEach(function(x) { var w = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.28, 0.7), cm); w.position.set(x, 0.17, 0); fg.add(w); });
+    var fgL = new THREE.Group(); fgL.position.set(-6.5, 0, 3.2);
+    var fgR = new THREE.Group(); fgR.position.set(-6.5, 0, 3.2);
+    var gm = new THREE.MeshStandardMaterial({ color: 0x44ee44, roughness: 0.3 });
+    var rm = new THREE.MeshStandardMaterial({ color: 0xdd2222, roughness: 0.3 });
+    for (var i = 0; i < 3; i++) {
+      var sp = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.18, 8), gm);
+      sp.position.set(-0.2, 0.2, -0.1 + i * 0.1); fg.add(sp);
+      var co = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.18, 8), rm);
+      co.position.set(0.2, 0.2, -0.1 + i * 0.1); fg.add(co);
+    }
+    S.add(fg); S.add(fgL); S.add(fgR);
+    mkZone(fgL, 0.45, 0.5, 0.7, 0.3);
+    mkZone(fgR, 0.45, 0.5, 0.7, 0.3);
+    fgL.children[fgL.children.length - 1].position.x = -0.225;
+    fgR.children[fgR.children.length - 1].position.x = 0.225;
+    coll(-6.95, -6.05, 2.85, 3.55);
+
+    // Grill
+    var gG = new THREE.Group(); gG.position.set(-3, 0, -3);
+    mkCount(gG, 1.8, 1.6, 0x666666);
+    var pan = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.06, 1.4), mD);
+    pan.position.y = 0.53; gG.add(pan);
+    G.gSlots = [
+      { p: [-0.32, 0, -0.28], o: 0, m: 0, t: 0, ti: 0, s: 'e', r: 0 },
+      { p: [0.32, 0, -0.28], o: 0, m: 0, t: 0, ti: 0, s: 'e', r: 0 },
+      { p: [-0.32, 0, 0.28], o: 0, m: 0, t: 0, ti: 0, s: 'e', r: 0 },
+      { p: [0.32, 0, 0.28], o: 0, m: 0, t: 0, ti: 0, s: 'e', r: 0 }
+    ];
+    S.add(gG); mkZone(gG, 1.8, 0.7, 1.6, 0.5);
+    coll(-3.9, -2.1, -3.8, -2.2);
+
+    // Fryer
+    var fG = new THREE.Group(); fG.position.set(0, 0, -3);
+    mkCount(fG, 1.8, 1.6, 0x666666);
+    var bb = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.2, 20), mD);
+    bb.position.y = 0.5; fG.add(bb);
+    var oo = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.08, 20), new THREE.MeshStandardMaterial({ color: 0xcc9900, roughness: 0.3 }));
+    oo.position.y = 0.57; fG.add(oo);
+    G.fSlots = [
+      { p: [-0.25, 0, -0.25], o: 0, m: 0, ti: 0, s: 'e', r: 0 },
+      { p: [0.25, 0, -0.25], o: 0, m: 0, ti: 0, s: 'e', r: 0 },
+      { p: [-0.25, 0, 0.25], o: 0, m: 0, ti: 0, s: 'e', r: 0 },
+      { p: [0.25, 0, 0.25], o: 0, m: 0, ti: 0, s: 'e', r: 0 }
+    ];
+    S.add(fG); mkZone(fG, 1.8, 0.7, 1.6, 0.5);
+    coll(-0.9, 0.9, -3.8, -2.2);
+
+    // Assembly
+    var aG = new THREE.Group(); aG.position.set(3.2, 0, -3);
+    mkCount(aG, 1.8, 1.6, 0x999999);
+    S.add(aG); mkZone(aG, 1.8, 0.7, 1.6, 0.5);
+    coll(2.3, 4.1, -3.8, -2.2);
+
+    // Prep
+    var pG = new THREE.Group(); pG.position.set(5.5, 0, 1.5);
+    mkCount(pG, 1.4, 0.8, 0x777777);
+    var kM = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.14, 0.07), new THREE.MeshStandardMaterial({ color: 0xcc1111, roughness: 0.3 }));
+    kM.position.set(-0.2, 0.57, 0); pG.add(kM);
+    var mM = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.14, 0.07), new THREE.MeshStandardMaterial({ color: 0xccaa00, roughness: 0.3 }));
+    mM.position.set(0.2, 0.57, 0); pG.add(mM);
+    S.add(pG); mkZone(pG, 1.4, 0.7, 0.8, 0.5);
+    coll(4.8, 6.2, 1.1, 1.9);
+
+    // Packing
+    var pkG = new THREE.Group(); pkG.position.set(5.5, 0, -0.5);
+    mkCount(pkG, 2.6, 3.2, 0x777777);
+    S.add(pkG); mkZone(pkG, 2.6, 0.7, 3.2, 0.5);
+    coll(4.2, 6.8, -2.1, 1.1);
+
+    // Tray cabinet
+    var tC = new THREE.Group(); tC.position.set(7.2, 0, -2.5);
+    mkCount(tC, 0.6, 0.6, 0x8B5E3C);
+    var tB = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.5), woods);
+    tB.position.y = 0.55; tC.add(tB);
+    for (var i = 0; i < 4; i++) {
+      var td = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.015, 0.2), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 }));
+      td.position.set(0, 0.28 + i * 0.018, 0); tC.add(td);
+    }
+    S.add(tC); mkZone(tC, 0.6, 0.6, 0.6, 0.4);
+    coll(6.9, 7.5, -2.85, -2.15);
+
+    // Front desk (extended Z)
+    var dG = new THREE.Group(); dG.position.set(0, 0, -8.5);
+    var dkT = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.08, 2.4), new THREE.MeshStandardMaterial({ color: 0xfafafa, roughness: 0.5 }));
+    dkT.position.y = 0.96; dG.add(dkT);
+    var dkB = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.9, 2.1), new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.6 }));
+    dkB.position.y = 0.45; dG.add(dkB);
+    S.add(dG); coll(-2.5, 2.5, -9.7, -7.3); mkZone(dG, 5, 0.5, 2.4, 0.5);
+
+    // Bathroom dividing wall + door
+    var bDiv = new THREE.Mesh(new THREE.BoxGeometry(1.92, 4, 0.2), new THREE.MeshStandardMaterial({ color: 0xe8e0d8, roughness: 0.8 }));
+    bDiv.position.set(-11.04, 2, 1.1); S.add(bDiv);
+    coll(-12, -10.08, 0.95, 1.25);
+
+    G.divPiv = new THREE.Group(); G.divPiv.position.set(-10.08, 0.9, 1.1);
+    var ddMat = new THREE.MeshStandardMaterial({ color: 0x8B6B4A, roughness: 0.7 });
+    var ddMesh = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.7, 0.2), ddMat);
+    ddMesh.position.set(0.9, 0, 0); G.divPiv.add(ddMesh);
+    coll(-10.08, -8.28, 0.95, 1.25, 'divDoorSolid');
+    S.add(G.divPiv);
+
+    // Toilet
+    var bMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.4 });
+    var bowl = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), bMat);
+    bowl.position.set(-10.3, 0.35, 4.37); S.add(bowl);
+    var cap = new THREE.Mesh(new THREE.SphereGeometry(0.31, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), bMat);
+    cap.scale.y = 0.05; cap.position.set(-10.3, 0.365, 4.37); S.add(cap);
+    var capF = new THREE.Mesh(new THREE.CircleGeometry(0.3, 16), bMat);
+    capF.rotation.x = -Math.PI / 2; capF.position.set(-10.3, 0.35, 4.37); S.add(capF);
+    var tMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.4 });
+    var tank = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), tMat);
+    tank.scale.set(0.98, 0.9, 0.4); tank.position.set(-10.3, 0.72, 4.69); S.add(tank);
+    var rect = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.65, 0.15), tMat);
+    rect.position.set(-10.3, 0.75, 4.825); S.add(rect);
+    coll(-10.6, -10.0, 4.1, 4.9);
+
+    // Sink
+    var sMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.5 });
+    var basin = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), sMat);
+    basin.position.set(-11.3, 0.8, 0.5); S.add(basin);
+    var sCap = new THREE.Mesh(new THREE.CircleGeometry(0.22, 16), sMat);
+    sCap.rotation.x = -Math.PI / 2; sCap.position.set(-11.3, 0.8, 0.5); S.add(sCap);
+    var stand = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.58), sMat);
+    stand.position.set(-11.3, 0.29, 0.5); S.add(stand);
+    var faucet = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.2, 0.02), new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.3 }));
+    faucet.position.set(-11.25, 0.92, 0.45); S.add(faucet);
+    coll(-11.6, -11.0, 0.2, 0.8);
+
+    // Trash can
+    var tG = new THREE.Group(); tG.position.set(7.5, 0, -0.5);
+    var trashB = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.5), new THREE.MeshStandardMaterial({ color: 0x6b4226, roughness: 0.9 }));
+    trashB.position.y = 0.2; tG.add(trashB);
+    var trashL = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.05, 0.55), new THREE.MeshStandardMaterial({ color: 0x5a3520, roughness: 0.9 }));
+    trashL.position.y = 0.43; tG.add(trashL);
+    S.add(tG); mkZone(tG, 0.5, 0.5, 0.5, 0.3);
+     coll(7.2, 7.8, -0.75, -0.25);
+
+     // ===== Event Handlers =====
+    document.addEventListener('keydown', function(e) {
+      var k = e.key.toLowerCase();
+      G.keys[k] = true;
+
+      if (k === ' ' && G.locked && G.phase === 'success') newRound();
+      if (k === ' ' && G.locked && G.phase === 'playing') G.renderer.domElement.requestPointerLock();
+      if (k === 'r' && G.phase === 'playing') {
+        // Near packing station → combine tray items OR disassemble combo
+        var atPack = G.camera.position.distanceTo(new THREE.Vector3(5.5, 0, -0.5)) < 2.5;
+        if (atPack && G.tray.placed && G.tray.slots.some(function(s){return s!==null;})) { combineCombo(); return; }
+        // Disassemble combo on packing station
+        if (atPack && G.comboOnDesk === null && G.carried && G.carried.userData.type === 'combo') { disassembleComboFromHand(); return; }
+        // Disassemble combo on front desk
+        if (G.comboOnDesk && G.camera.position.distanceTo(G.comboOnDesk.position) < 2.5) { disassembleCombo(); return; }
+      }
+      if (k === 't' && G.phase === 'playing') {
+        var p = document.getElementById('order-paper');
+        p.style.display = p.style.display === 'none' ? 'block' : 'none';
+      }
+      if (k === 'f') {
+        if (G.camera.position.distanceTo(new THREE.Vector3(-6.5, 0, 3.2)) < 2.5) getDrink('right');
+        if (G.camera.position.distanceTo(new THREE.Vector3(-9.5, 0, 1.1)) < 2.5) toggleDivDoor();
+      }
+      if (k === 'q' && G.carried) { var isCombo = G.carried.userData.type === 'combo'; dropIt(); msg(isCombo ? '丢掉套餐' : '丢掉食材'); }
+    });
+
+    document.addEventListener('keyup', function(e) { G.keys[e.key.toLowerCase()] = false; });
+
+    document.addEventListener('pointerlockchange', function() {
+      G.locked = document.pointerLockElement === G.renderer.domElement;
+      if (G.locked && G.phase === 'ordering') {
+        G.phase = 'waiting';
+        spawnCustomers();
+        msg('→ 走到前台跟顾客对话接单', 3000);
+      }
+    });
+
+    document.addEventListener('mousemove', function(e) {
+      if (!G.locked) return;
+      G.yaw -= e.movementX * 0.002;
+      G.pitch = Math.max(-1.4, Math.min(1.4, G.pitch - e.movementY * 0.002));
+    });
+
+    document.addEventListener('mousedown', function(e) {
+      if (!G.locked) return;
+      if (e.button === 0) {
+        var st = getStation();
+        if (st === gG) handleGrill();
+        else if (st === fG) handleFryer();
+        else if (st === aG) handleAss();
+        else if (st === pG) handlePrep();
+        else if (st === cabSteak) handleCab('steak');
+        else if (st === cabEgg) handleCab('egg');
+        else if (st === cabLett) handleCab('lettuce');
+        else if (st === cabFries) handleCab('fries');
+        else if (st === cabBB) handleCab('bun_bot');
+        else if (st === cabTB) handleCab('bun_top');
+        else if (st === fgL) getDrink('left');
+        else if (st === fgR) getDrink('right');
+        else if (st === tG) handleTrash();
+        else if (st === pkG) handlePack();
+        else if (st === tC) handleTray();
+        else if (st === dG) { if (G.carried && G.carried.userData.type === 'combo') deliverCombo(G.carried); else msg('想把套餐放这里? 先去后厨制作'); }
+        else {
+          var found = false;
+          for (var i = 0; i < G.customers.length; i++) {
+            if (st === G.customers[i].group) { talkTo(G.customers[i]); found = true; break; }
+          }
+          if (!found) { var l = getLoose(); if (l) pickUp(l); }
+        }
+      }
+    });
+    document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+    // Start animation
+    animate();
+    // Request pointer lock after a brief delay to ensure render is ready
+    setTimeout(function() { G.renderer.domElement.requestPointerLock(); }, 100);
+    console.log('Game started');
+
+  } catch (e) {
+    console.error(e.message);
+    alert('Error: ' + e.message);
+  }
+}
+
+// Animation loop
+function animate() {
+  requestAnimationFrame(animate);
+  var dt = Math.min(G.clock.getDelta(), 0.05);
+
+  if (G.locked) {
+    var fwd = new THREE.Vector3(-Math.sin(G.yaw), 0, -Math.cos(G.yaw));
+    var right = new THREE.Vector3(fwd.z, 0, -fwd.x);
+    var mv = new THREE.Vector3();
+    if (G.keys['w']) mv.add(fwd);
+    if (G.keys['s']) mv.sub(fwd);
+    if (G.keys['a']) mv.add(right);
+    if (G.keys['d']) mv.sub(right);
+    if (mv.length() > 0) mv.normalize().multiplyScalar(G.speed * dt);
+    var nx = G.camera.position.x + mv.x, nz = G.camera.position.z + mv.z;
+    if (canMove(nx, G.camera.position.z, 0.25)) G.camera.position.x = nx;
+    if (canMove(G.camera.position.x, nz, 0.25)) G.camera.position.z = nz;
+    var zMin = -30;
+    G.camera.position.x = Math.max(-12, Math.min(12, G.camera.position.x));
+    G.camera.position.z = Math.max(zMin, Math.min(4.8, G.camera.position.z));
+  }
+
+  G.camera.quaternion.setFromEuler(new THREE.Euler(G.pitch, G.yaw, 0, 'YXZ'));
+
+  // Carried item
+  if (G.carried) {
+    var off = new THREE.Vector3(0.5, -0.35, -0.85).applyQuaternion(G.camera.quaternion);
+    G.carried.position.copy(G.camera.position).add(off);
+    G.carried.quaternion.copy(G.camera.quaternion);
+    var sc = G.carried.userData.type === 'burger' ? 2 : 2.5;
+    G.carried.scale.set(sc, sc, sc);
+    G.carried.position.y -= 0.05;
+  }
+
+  // Grill cooking
+  G.gSlots.forEach(function(s) {
+    if (s.s !== 'cooking') return;
+    s.ti += dt;
+    var ct = s.t === 'steak' ? 8 : 4, bt = s.t === 'steak' ? 14 : 7;
+    if (s.ti >= bt) { if (s.m) { G.scene.remove(s.m); s.m = 0; } s.o = 0; s.s = 'e'; s.t = 0; s.ti = 0; s.r = 0; msg('煎糊了！已丢弃'); }
+    else if (s.ti >= ct && !s.r) { s.s = 'ready'; s.r = 1; if (s.m) { if (s.m.isMesh) s.m.material = s.t === 'steak' ? new THREE.MeshStandardMaterial({ color: 0x6b3a1f, roughness: 0.8 }) : new THREE.MeshStandardMaterial({ color: 0xfff8dc, roughness: 0.5 }); if (s.m.userData) s.m.userData.state = 'cooked'; } msg(s.t === 'steak' ? '牛排煎好了' : '鸡蛋煎好了'); }
+  });
+
+  // Fryer cooking
+  G.fSlots.forEach(function(s) {
+    if (s.s !== 'cooking') return;
+    s.ti += dt;
+    if (s.ti >= 11) { if (s.m) { G.scene.remove(s.m); s.m = 0; } s.o = 0; s.s = 'e'; s.ti = 0; s.r = 0; msg('炸糊了！已丢弃'); }
+    else if (s.ti >= 6 && !s.r) { s.s = 'ready'; s.r = 1; if (s.m && s.m.userData) s.m.userData.state = 'cooked'; if (s.m && s.m.type === 'Group') s.m.children.forEach(function(c) { if (c.isMesh) c.material = new THREE.MeshStandardMaterial({ color: 0xd4942b, roughness: 0.6 }); }); msg('薯条炸好了'); }
+  });
+
+  // Drop physics
+  for (var i = G.drops.length - 1; i >= 0; i--) {
+    var d = G.drops[i];
+    d.v.y -= 0.05;
+    var nx2 = d.m.position.x + d.v.x * 0.02, nz2 = d.m.position.z + d.v.z * 0.02;
+    var blocked = false;
+    for (var j = 0; j < G.boxes.length; j++) {
+      var bx = G.boxes[j];
+      if (bx.key && !window[bx.key]) continue;
+      if (nx2 + 0.15 > bx.minX && nx2 - 0.15 < bx.maxX && nz2 + 0.15 > bx.minZ && nz2 - 0.15 < bx.maxZ) { blocked = true; break; }
+    }
+    if (blocked) { d.v.x = 0; d.v.z = 0; } else { d.m.position.x = nx2; d.m.position.z = nz2; }
+    d.m.position.y += d.v.y * 0.02;
+    d.l--;
+    if (d.m.position.y < 0.05 || d.l <= -60) { d.m.position.y = 0.05; d.v.x = 0; d.v.z = 0; if (d.l <= -90) G.drops.splice(i, 1); }
+  }
+
+  G.renderer.render(G.scene, G.camera);
+}
+
+// ===== GAME FUNCTIONS =====
+function getStation() {
+  var ray = new THREE.Raycaster();
+  var ptr = new THREE.Vector2(0, 0);
+  ray.setFromCamera(ptr, G.camera);
+  var hits = ray.intersectObjects(G.zones);
+  if (hits.length > 0) {
+    var o = hits[0].object;
+    while (o) { if (o.userData.isInteractable) return o.parent; o = o.parent; }
+  }
+  return null;
+}
+
+function getLoose() {
+  if (G.loose.length === 0) return null;
+  var ray = new THREE.Raycaster();
+  var ptr = new THREE.Vector2(0, 0);
+  ray.setFromCamera(ptr, G.camera);
+  var hits = ray.intersectObjects(G.loose, true);
+  if (hits.length > 0) {
+    var o = hits[0].object;
+    while (o) { if (o.userData.canPickup) return o; o = o.parent; }
+  }
+  return null;
+}
+
+// Food creation
+function cSteak(cooked) {
+  var m = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.07, 0.4), cooked ? new THREE.MeshStandardMaterial({ color: 0x6b3a1f, roughness: 0.8 }) : new THREE.MeshStandardMaterial({ color: 0xcc3333, roughness: 0.9 }));
+  m.castShadow = true;
+  m.userData = { type: 'steak', state: cooked ? 'cooked' : 'raw', canPickup: 0 };
+  return m;
+}
+
+function cFries(cooked) {
+  var g = new THREE.Group();
+  var mat = cooked ? new THREE.MeshStandardMaterial({ color: 0xd4942b, roughness: 0.6 }) : new THREE.MeshStandardMaterial({ color: 0xf5e6a3, roughness: 0.7 });
+  for (var i = 8 + Math.floor(Math.random() * 4); i > 0; i--) {
+    var f = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.18, 6), mat);
+    f.position.set((Math.random() - 0.5) * 0.16, Math.random() * 0.02, (Math.random() - 0.5) * 0.16);
+    f.rotation.set(Math.random() * 0.4, Math.random() * 6.28, Math.random() * 0.4);
+    g.add(f);
+  }
+  g.userData = { type: 'fries', state: cooked ? 'cooked' : 'raw', canPickup: 0 };
+  return g;
+}
+
+function cEgg(raw) {
+  var g = new THREE.Group();
+  if (raw) {
+    var w = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), new THREE.MeshStandardMaterial({ color: 0xf5deb3, roughness: 0.5 }));
+    w.scale.set(0.85, 0.55, 0.7); g.add(w);
+    var y2 = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 6), new THREE.MeshStandardMaterial({ color: 0xffa500, roughness: 0.3 }));
+    y2.scale.set(0.5, 0.3, 0.4); y2.position.y = 0.01; g.add(y2);
+    g.userData = { type: 'egg', state: 'raw', canPickup: 0 };
+  } else {
+    var w = new THREE.Mesh(new THREE.CircleGeometry(0.17, 12), new THREE.MeshStandardMaterial({ color: 0xfff8dc, roughness: 0.5 }));
+    w.rotation.x = -Math.PI / 2; g.add(w);
+    var y2 = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffa500, roughness: 0.3 }));
+    y2.scale.set(1, 0.4, 0.8); y2.position.y = 0.005; g.add(y2);
+    g.userData = { type: 'egg', state: 'cooked', canPickup: 0 };
+  }
+  return g;
+}
+
+function cLett() {
+  var m = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), new THREE.MeshStandardMaterial({ color: 0x4a8c3f, roughness: 0.8 }));
+  m.scale.set(1.3, 0.28, 0.9);
+  m.userData = { type: 'lettuce', state: 'raw', canPickup: 0 };
+  return m;
+}
+
+// Station handlers
+function handleGrill() {
+  if (G.carried && (G.carried.userData.type === 'steak' || G.carried.userData.type === 'egg') && G.carried.userData.state === 'raw') {
+    placeOnGrill(G.carried, G.carried.userData.type);
+    return;
+  }
+  if (!G.carried) {
+    var r = G.gSlots.find(function(s) { return s.s === 'ready'; });
+    if (r) { var m = r.m; r.o = 0; r.m = 0; r.t = 0; r.ti = 0; r.s = 'e'; r.r = 0; pickUp(m); return; }
+    var b = G.gSlots.filter(function(s) { return s.o; });
+    if (!b.length) msg('从柜子拿食材来煎');
+    else msg('正在煎...');
+    return;
+  }
+  msg('不能放这里');
+}
+
+function placeOnGrill(mesh, type) {
+  var slot = G.gSlots.find(function(s) { return !s.o; });
+  if (!slot) { msg('煎锅满了'); return; }
+  G.carried = null;
+  mesh.userData.canPickup = 0;
+  var idx = G.loose.indexOf(mesh);
+  if (idx >= 0) G.loose.splice(idx, 1);
+  G.scene.remove(mesh);
+  var p = slot.p;
+  mesh.position.set(-3 + p[0], type === 'steak' ? 0.595 : 0.585, -3 + p[2]);
+  mesh.rotation.set(0, 0, 0);
+  G.scene.add(mesh);
+  slot.o = 1; slot.m = mesh; slot.t = type; slot.ti = 0; slot.s = 'cooking'; slot.r = 0;
+  msg(type === 'steak' ? '生牛排放上煎锅' : '鸡蛋放上煎锅');
+}
+
+function handleFryer() {
+  if (G.carried && G.carried.userData.type === 'fries' && G.carried.userData.state === 'raw') {
+    var slot = G.fSlots.find(function(s) { return !s.o; });
+    if (!slot) { msg('炸锅满了'); return; }
+    var m = G.carried; G.carried = null;
+    m.userData.canPickup = 0;
+    var idx = G.loose.indexOf(m);
+    if (idx >= 0) G.loose.splice(idx, 1);
+    G.scene.remove(m);
+    var p = slot.p;
+    m.position.set(p[0], 0.63, -3 + p[2]);
+    G.scene.add(m);
+    slot.o = 1; slot.m = m; slot.ti = 0; slot.s = 'cooking'; slot.r = 0;
+    msg('生薯条下锅');
+    return;
+  }
+  if (!G.carried) {
+    var r = G.fSlots.find(function(s) { return s.s === 'ready'; });
+    if (r) { var m = r.m; r.o = 0; r.m = 0; r.ti = 0; r.s = 'e'; r.r = 0; pickUp(m); return; }
+    var e = G.fSlots.find(function(s) { return !s.o; });
+    if (e) {
+      var cl = cFries(false);
+      var p = e.p;
+      cl.position.set(p[0], 0.63, -3 + p[2]);
+      cl.userData.canPickup = 0;
+      G.scene.add(cl);
+      e.o = 1; e.m = cl; e.ti = 0; e.s = 'cooking'; e.r = 0;
+      msg('生薯条下锅');
+    } else msg('炸锅满了');
+    return;
+  }
+  msg('不能放这里');
+}
+
+function handleAss() {
+  if (!G.carried && G.ass.bBot && G.ass.bTop) {
+    if (G.ass.vis) G.scene.remove(G.ass.vis);
+    var bg = new THREE.Group(), y = 0;
+    if (G.ass.bBot) { var b = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xd4a047, roughness: 0.7 })); b.position.y = y; b.scale.y = 0.55; bg.add(b); y += 0.07; }
+    if (G.ass.stk) { for (var si = 0; si < G.ass.stk; si++) { var p = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.06, 20), new THREE.MeshStandardMaterial({ color: 0x6b3a1f, roughness: 0.8 })); p.position.y = y + 0.03; bg.add(p); y += 0.06; } }
+    if (G.ass.eg) { for (var ei = 0; ei < G.ass.eg; ei++) { var w = new THREE.Mesh(new THREE.CircleGeometry(0.17, 12), new THREE.MeshStandardMaterial({ color: 0xfff8dc, roughness: 0.5 })); w.rotation.x = -Math.PI / 2; w.position.y = y; bg.add(w); var yk = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffa500, roughness: 0.3 })); yk.scale.set(1, 0.4, 0.8); yk.position.set(0, y + 0.01, -0.01); bg.add(yk); y += 0.035; } }
+    if (G.ass.lt) { for (var li = 0; li < G.ass.lt; li++) { var l = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 6), new THREE.MeshStandardMaterial({ color: 0x4a8c3f, roughness: 0.8 })); l.scale.set(1.5, 0.12, 1.3); l.position.y = y + 0.01; bg.add(l); y += 0.035; } }
+    var cap = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xd4a047, roughness: 0.7 }));
+    cap.position.y = y; cap.scale.y = 0.85; bg.add(cap);
+    var recipe = [];
+    for (var ri = 0; ri < G.ass.stk; ri++) recipe.push('steak');
+    for (var ri = 0; ri < G.ass.eg; ri++) recipe.push('egg');
+    for (var ri = 0; ri < G.ass.lt; ri++) recipe.push('lettuce');
+    if (G.ass.sc) { for (var si3=0;si3<G.ass.sc.length;si3++)recipe.push(G.ass.sc[si3]); }
+    bg.position.set(3.2, 0.5, -3);
+    bg.userData = { type: 'burger', state: 'cooked', canPickup: 1, recipe: recipe };
+    G.scene.add(bg);
+    pickUp(bg);
+    G.ass.bBot = 0; G.ass.stk = 0; G.ass.eg = 0; G.ass.lt = 0; G.ass.bTop = 0; G.ass.sc = []; G.ass.vis = null;
+    msg('拿起汉堡！');
+    return;
+  }
+  if (!G.carried) {
+    if (!G.ass.bBot) msg('先放底层面包');
+    else if (G.ass.bTop) msg('汉堡已做好，点击拿起');
+    else msg('放食材到汉堡上');
+    return;
+  }
+  var t = G.carried.userData.type, s = G.carried.userData.state;
+  if (G.ass.bTop) { msg('汉堡已做好，不能再加'); return; }
+  if (!G.ass.bBot) {
+    if (t === 'bun' && !G.carried.userData.isTop) { G.ass.bBot = 1; G.scene.remove(G.carried); G.carried = null; buildBurg(); msg('放好了！'); return; }
+    msg('先放底层面包！'); return;
+  }
+  if (t === 'bun' && G.carried.userData.isTop) { G.ass.bTop = 1; G.scene.remove(G.carried); G.carried = null; buildBurg(); msg('汉堡做好了！点击拿起', 3000); return; }
+  if (t === 'bun') { msg('已有底层面包'); return; }
+  if (t === 'ketchup' || t === 'mustard') { if(G.ass.sc.length>=2){msg('酱最多放两份');return;} G.ass.sc.push(t); G.scene.remove(G.carried); G.carried = null; buildBurg(); msg(t === 'ketchup' ? '挤上番茄酱' : '挤上芥末酱'); return; }
+  if (t === 'fries') { msg('薯条是配菜，不能放汉堡里'); return; }
+  var ch = { steak: s === 'cooked', egg: s === 'cooked', lettuce: true };
+  var fg2 = { steak: 'stk', egg: 'eg', lettuce: 'lt' };
+  var mc2 = { stk: 3, eg: 3, lt: 3 };
+  if (ch[t] && G.ass[fg2[t]] < mc2[fg2[t]]) { G.ass[fg2[t]]++; G.scene.remove(G.carried); G.carried = null; buildBurg(); msg('放好了！'); if (G.ass.bBot && G.ass.bTop) msg('汉堡做好了！点击拿起', 3000); return; }
+  if (!ch[t] && fg2[t]) { msg(t === 'steak' ? '需要熟牛排' : '需要熟鸡蛋'); return; }
+  if (fg2[t] && G.ass[fg2[t]] >= mc2[fg2[t]]) { msg('已加满了'); return; }
+  if (fg2[t] && G.ass[fg2[t]]) { msg('已添加'); return; }
+  msg('不能放这个');
+}
+
+function buildBurg() {
+  if (G.ass.vis) { G.scene.remove(G.ass.vis); G.ass.vis = null; }
+  if (!G.ass.bBot && !G.ass.bTop) return;
+  var g = new THREE.Group(), y = 0;
+  if (G.ass.bBot) { var b = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xd4a047, roughness: 0.7 })); b.position.y = y; b.scale.y = 0.55; g.add(b); y += 0.07; }
+  if (G.ass.lt) { for (var li2 = 0; li2 < G.ass.lt; li2++) { var l2 = new THREE.Mesh(new THREE.SphereGeometry(0.17, 8, 6), new THREE.MeshStandardMaterial({ color: 0x4a8c3f, roughness: 0.8 })); l2.scale.set(1.5, 0.12, 1.3); l2.position.y = y + 0.01; g.add(l2); y += 0.035; } }
+  if (G.ass.stk) { for (var si2 = 0; si2 < G.ass.stk; si2++) { var p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.06, 20), new THREE.MeshStandardMaterial({ color: 0x6b3a1f, roughness: 0.8 })); p2.position.y = y + 0.03; g.add(p2); y += 0.06; } }
+  if (G.ass.eg) { for (var ei2 = 0; ei2 < G.ass.eg; ei2++) { var w2 = new THREE.Mesh(new THREE.CircleGeometry(0.17, 12), new THREE.MeshStandardMaterial({ color: 0xfff8dc, roughness: 0.5 })); w2.rotation.x = -Math.PI / 2; w2.position.y = y; g.add(w2); var yk2 = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffa500, roughness: 0.3 })); yk2.scale.set(1, 0.4, 0.8); yk2.position.set(0, y + 0.01, -0.01); g.add(yk2); y += 0.035; } }
+  if(G.ass.sc && G.ass.sc.length>0){if(G.ass.sc.length===1){var sMat=new THREE.MeshStandardMaterial({color:G.ass.sc[0]==='ketchup'?0xcc1111:0xccaa00});var sDisc=new THREE.Mesh(new THREE.CircleGeometry(0.12,12),sMat);sDisc.rotation.x=-Math.PI/2;sDisc.position.y=y+0.01;g.add(sDisc);}else{var sc1=G.ass.sc[0],sc2=G.ass.sc[1];var smA=new THREE.MeshStandardMaterial({color:sc1==='ketchup'?0xcc1111:0xccaa00});var spA=new THREE.Mesh(new THREE.CircleGeometry(0.18,16),smA);spA.rotation.x=-Math.PI/2;spA.position.y=y+0.005;g.add(spA);var smB=new THREE.MeshStandardMaterial({color:sc2==='ketchup'?0xcc1111:0xccaa00});var spB=new THREE.Mesh(new THREE.CircleGeometry(0.1,12),smB);spB.rotation.x=-Math.PI/2;spB.position.set(0.06,y+0.008,0.05);g.add(spB);}}
+  if (G.ass.bTop) { var cap2 = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xd4a047, roughness: 0.7 })); cap2.position.y = y; cap2.scale.y = 0.85; g.add(cap2); for (var i5 = 5; i5 > 0; i5--) { var sd = new THREE.Mesh(new THREE.SphereGeometry(0.012, 4, 4), new THREE.MeshStandardMaterial({ color: 0xeedd88 })); sd.position.set((Math.random() - 0.5) * 0.22, y + 0.04, (Math.random() - 0.5) * 0.22); g.add(sd); } }
+  g.position.set(3.2, 0.5, -3);
+  G.scene.add(g);
+  G.ass.vis = g;
+}
+
+function handlePrep() {
+  if (G.carried && (G.carried.userData.type === 'ketchup' || G.carried.userData.type === 'mustard')) {
+    G.scene.remove(G.carried); G.carried = null; msg('放回工作台'); return;
+  }
+  if (G.carried) { msg('先丢掉手里的东西'); return; }
+  var names = ['ketchup', 'mustard'];
+  var n = names[G.prepIdx % 2];
+  var m = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.05), new THREE.MeshStandardMaterial({ color: n === 'ketchup' ? 0xcc1111 : 0xccaa00, roughness: 0.3 }));
+  m.castShadow = true;
+  m.userData = { type: n, state: 'cooked', canPickup: 1 };
+  G.scene.add(m);
+  pickUp(m);
+  G.prepIdx++;
+  msg(n === 'ketchup' ? '番茄酱' : '芥末酱');
+}
+
+function handleCab(type) {
+  if (G.carried) {
+    var t = G.carried.userData.type, s2 = G.carried.userData.state;
+    if ((type === 'steak' && t === 'steak' && s2 === 'raw') ||
+      (type === 'egg' && t === 'egg' && s2 === 'raw') ||
+      (type === 'lettuce' && t === 'lettuce') ||
+      (type === 'fries' && t === 'fries' && s2 === 'raw') ||
+      (type === 'bun_bot' && t === 'bun' && !G.carried.userData.isTop) ||
+      (type === 'bun_top' && t === 'bun' && G.carried.userData.isTop)) {
+      G.scene.remove(G.carried); G.carried = null; msg('放回' + ({ steak: '牛排', egg: '鸡蛋', lettuce: '生菜', fries: '薯条', bun_bot: '底层面包', bun_top: '顶层面包' } [type])); return;
+    }
+    msg('不能放在这里'); return;
+  }
+  var m;
+  switch (type) {
+    case 'steak': m = cSteak(false); m.userData.canPickup = 1; break;
+    case 'egg': m = cEgg(true); m.userData.canPickup = 1; break;
+    case 'lettuce': m = cLett(); m.userData.canPickup = 1; break;
+    case 'fries': m = cFries(false); m.userData.canPickup = 1; break;
+    case 'bun_bot':
+      m = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xd4a047, roughness: 0.7 }));
+      m.scale.y = 0.55; m.castShadow = true; m.userData = { type: 'bun', state: 'cooked', canPickup: 1, isTop: false }; break;
+    case 'bun_top':
+      m = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xd4a047, roughness: 0.7 }));
+      m.scale.y = 0.85; m.castShadow = true; m.userData = { type: 'bun', state: 'cooked', canPickup: 1, isTop: true }; break;
+  }
+   G.scene.add(m);
+   pickUp(m);
+   msg('拿出' + ({ steak: '生牛排', egg: '鸡蛋', lettuce: '生菜', fries: '生薯条', bun_bot: '底层面包', bun_top: '顶层面包' } [type]));
+}
+
+function getDrink(side) {
+  if (G.carried && (G.carried.userData.type === 'cola' || G.carried.userData.type === 'sprite')) {
+    G.scene.remove(G.carried); G.carried = null; msg('放回冰箱'); return;
+  }
+  if (G.carried) { msg('先丢掉手里的东西'); return; }
+  var isCola = side === 'right';
+  var m = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.16, 10), new THREE.MeshStandardMaterial({ color: isCola ? 0xdd2222 : 0x44ee44, roughness: 0.3 }));
+  m.castShadow = true;
+  m.userData = { type: isCola ? 'cola' : 'sprite', state: 'cooked', canPickup: 1 };
+  G.scene.add(m);
+  pickUp(m);
+  msg(isCola ? '拿出可乐' : '拿出雪碧');
+}
+
+function handleTrash() {
+  if (!G.carried) { msg('没有东西可丢'); return; }
+  G.scene.remove(G.carried); G.carried = null; msg('已丢弃');
+}
+
+function handlePack() {
+  if (!G.carried) {
+    if (G.tray.placed) {
+      var occ = G.tray.slots.filter(function(s) { return s !== null; }).length;
+      if (occ) { for (var i = 5; i >= 0; i--) { if (G.tray.slots[i]) { var m = G.tray.slots[i]; G.tray.slots[i] = null; m.userData.canPickup = 1; pickUp(m); msg('拿起食品'); return; } } }
+      else { G.scene.remove(G.tray.mesh); G.tray.mesh = null; G.tray.placed = false; msg('收起托盘'); return; }
+    }
+    msg('先放托盘'); return;
+  }
+  if (G.carried.userData.type === 'tray') {
+    if (G.tray.placed) { msg('已有托盘'); return; }
+    var m = G.carried; G.carried = null;
+    m.scale.set(4, 1, 4.2); m.rotation.set(0, 0, 0);
+    m.position.set(5.5, 0.5125, -0.5);
+    m.userData.canPickup = 0;
+    G.scene.add(m);
+    G.tray.mesh = m; G.tray.placed = true;
+    msg('托盘放好了'); return;
+  }
+  if (G.carried && G.carried.userData.type === 'combo') {
+    G.carried.position.set(5.5, 0.55, -0.5); G.carried.rotation.set(0, 0, 0); G.carried.scale.set(1, 1, 1);
+    G.carried = null; coll(5.2, 5.8, -0.8, -0.2, 'comboSolid'); msg('套餐放在包装台，按 R 拆解'); return;
+  }
+  if (G.carried.userData.type === 'ketchup' || G.carried.userData.type === 'mustard') { msg('酱料不能放这里'); return; }
+  if (!G.tray.placed) { msg('先放托盘'); return; }
+  var empty = G.tray.slots.findIndex(function(s) { return s === null; });
+  if (empty === -1) { msg('托盘已满'); return; }
+  var m = G.carried; G.carried = null;
+  var sl = slotPos[empty];
+  if (m.userData.type === 'fries') { m.rotation.set(0, 0, 0); m.children.forEach(function(c) { if (c.isMesh) { c.rotation.x = Math.PI / 2; c.position.y = 0; } }); } else m.rotation.set(0, 0, 0);
+  m.position.set(5.5 + sl[0], sl[1], -0.5 + sl[2]);
+  m.userData.canPickup = 0;
+  G.scene.add(m);
+  G.tray.slots[empty] = m;
+  msg('放好了');
+}
+
+function handleTray() {
+  if (G.carried) { msg('先丢掉手里的东西'); return; }
+  var tray = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.025, 0.55), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 }));
+  tray.castShadow = true;
+  tray.userData = { type: 'tray', state: 'cooked', canPickup: 1 };
+  G.scene.add(tray);
+  pickUp(tray);
+  msg('拿出托盘');
+}
+
+function combineCombo() {
+  var items = []; var contents = [];
+  G.tray.slots.forEach(function(s, i) {
+    if (!s) return;
+    items.push(s);
+    contents.push({ type: s.userData.type, recipe: s.userData.recipe || null, state: s.userData.state || null });
+    G.scene.remove(s);
+    G.tray.slots[i] = null;
+  });
+  if (items.length === 0) { msg('托盘上没有东西'); return; }
+  var combo = new THREE.Group();
+  items.forEach(function(it) { combo.add(it); });
+  if (G.tray.mesh) { combo.add(G.tray.mesh); G.scene.remove(G.tray.mesh); G.tray.mesh = null; }
+  G.tray.placed = false;
+  combo.userData = { type: 'combo', state: 'cooked', canPickup: 1, contents: contents };
+  combo.position.set(5.5, 0.55, -0.5);
+  G.scene.add(combo);
+  G.carried = combo;
+  G.loose.push(combo);
+  coll(5.2, 5.8, -0.8, -0.2, 'comboSolid');
+  msg('拿起套餐');
+}
+
+function disassembleComboFromHand() {
+  if (!G.carried || G.carried.userData.type !== 'combo') return;
+  var combo = G.carried; G.carried = null;
+  combo.scale.set(1, 1, 1);
+  // Create tray on packing station
+  var tray = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.025, 0.55), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 }));
+  tray.scale.set(4, 1, 4.2); tray.position.set(5.5, 0.5125, -0.5);
+  G.scene.add(tray); G.tray.mesh = tray; G.tray.placed = true;
+  // Extract items from combo group back to tray
+  var ci = 0;
+  var toRemove = [];
+  while (combo.children.length > 0 && ci < 6) {
+    var child = combo.children[0];
+    combo.remove(child);
+    toRemove.push(child);
+    ci++;
+  }
+  // Remove tray from combo group (it was added as a child)
+  var trayInCombo = toRemove.pop(); // last added = tray mesh
+  // Place remaining items on tray slots
+  var si = 0;
+  toRemove.forEach(function(it) {
+    G.tray.slots[si] = it;
+    it.position.set(5.5 + slotPos[si][0], slotPos[si][1], -0.5 + slotPos[si][2]);
+    it.userData.canPickup = 0;
+    G.scene.add(it);
+    si++;
+  });
+  G.scene.remove(combo);
+  collRemove('comboSolid');
+  msg('套餐已拆解');
+}
+
+function disassembleCombo() {
+  if (!G.comboOnDesk) return;
+  var combo = G.comboOnDesk; G.comboOnDesk = null;
+  var contents = combo.userData.contents || [];
+  // Create tray
+  var tray = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.025, 0.55), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 }));
+  tray.scale.set(4, 1, 4.2); tray.position.set(5.5, 0.5125, -0.5);
+  G.scene.add(tray); G.tray.mesh = tray; G.tray.placed = true;
+  // Remove combo from scene
+  G.scene.remove(combo);
+  collRemove('comboSolid');
+  G.comboOnDesk = null;
+  // Clone items back to slots from the combo group
+  var ci = 0;
+  while (combo.children.length > 0 && ci < 6) {
+    var child = combo.children[0];
+    combo.remove(child);
+    G.tray.slots[ci] = child;
+    child.position.set(5.5 + slotPos[ci][0], slotPos[ci][1], -0.5 + slotPos[ci][2]);
+    child.userData.canPickup = 0;
+    G.scene.add(child);
+    ci++;
+  }
+  msg('套餐已拆解，可以重新制作');
+}
+
+function deliverCombo(combo) {
+  var nc = null;
+  for (var i = 0; i < G.customers.length; i++) {
+    if (!G.customers[i].served && G.customers[i].dialogued) { nc = G.customers[i]; break; }
+  }
+  if (!nc) { msg('没有等待的顾客'); return; }
+  G.carried = null;
+  combo.position.set(-4.5, 0.51, -9.3);
+  combo.rotation.set(0, 0, 0);
+  combo.scale.set(1, 1, 1);
+  msg('正在确认订单...', 2500);
+  var savedCombo = combo; var savedNC = nc;
+  setTimeout(function() {
+    var items = [], burgerRecipe = null;
+    (savedCombo.userData.contents || []).forEach(function(c) {
+      if (c.type === 'burger') { items.push('burger'); burgerRecipe = c.recipe || []; }
+      else if (c.type === 'fries') items.push('fries');
+      else if (c.type === 'cola' || c.type === 'sprite') items.push(c.type);
+    });
+    if (!checkOrder(savedNC.order, burgerRecipe, items)) {
+      msg('顾客: "这不是我想要的"');
+      savedCombo.position.set(-4.5, 0.51, -9.3);
+      coll(-5.0, -4.0, -9.0, -8.0, 'comboSolid');
+      G.comboOnDesk = savedCombo;
+      return;
+    }
+    // Success!
+    G.scene.remove(savedCombo);
+    savedNC.served = true; hidePaper(); G.phase = 'delivering';
+    var w = createWaiter(); w.position.set(savedNC.x, 0, -6.5); G.scene.add(w); G.waiter = w;
+    var price = calcPrice(savedNC.order); showResult(true, price); G.phase = 'success';
+    setTimeout(function() { G.scene.remove(w); G.waiter = null; }, 1500);
+    setTimeout(function() {
+      G.scene.remove(savedNC.group); savedNC.group = null;
+      spawnCustomers(); G.phase = 'waiting'; hideResult(); msg('新顾客来了', 3000);
+    }, 4500);
+  }, 2000);
+}
+
+function toggleDivDoor() {
+  if (!G.dOpen) {
+    G.dOpen = true;
+    collRemove('divDoorSolid');
+    var st = performance.now();
+    (function d1() { var t = Math.min((performance.now() - st) / 500, 1); G.divPiv.rotation.y = Math.PI / 2 * t; if (t < 1) requestAnimationFrame(d1); })();
+  } else {
+    G.dOpen = false;
+    var st2 = performance.now();
+    (function d2() { var t2 = Math.min((performance.now() - st2) / 500, 1); G.divPiv.rotation.y = Math.PI / 2 * (1 - t2); if (t2 < 1) requestAnimationFrame(d2); else coll(-10.08, -8.28, 0.95, 1.25, 'divDoorSolid'); })();
+  }
+}
+
+// ===== CUSTOMER SYSTEM =====
+var custTexts = ['今天天气真好啊', '刚下班，饿死了', '听朋友说这家不错', '来个汉堡垫垫肚子',
+  '今天想大吃一顿', '随便做点啥都行', '肚子好饿啊～', '好久没吃汉堡了', '有什么推荐的吗',
+  '今天心情好，犒劳自己', '快点快点饿死了', '少放点生菜哈', '要辣一点的！'];
+var custColors = [0xff6b6b, 0x6bc5ff, 0xffd93d, 0xa8e6cf, 0xdda0dd, 0xff9f43, 0x6dd5ed, 0xffcccc];
+
+function spawnCustomers() {
+  G.customers.forEach(function(c) { if (c.group) { G.scene.remove(c.group); c.group = null; } });
+  G.customers = [];
+  var count = 2 + Math.floor(Math.random() * 2);
+  var usedX = [];
+  for (var ci = 0; ci < count; ci++) {
+    var cx;
+    var attempts = 0;
+    do { cx = (Math.random() - 0.5) * 4; attempts++; } while (usedX.some(function(u) { return Math.abs(u - cx) < 1.2; }) && attempts < 50);
+    usedX.push(cx);
+    var g = new THREE.Group();
+    var hc = custColors[Math.floor(Math.random() * custColors.length)];
+    var body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.5, 8), new THREE.MeshStandardMaterial({ color: hc, roughness: 0.7 }));
+    body.position.y = 0.75; g.add(body);
+    var head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), new THREE.MeshStandardMaterial({ color: 0xf5cba7, roughness: 0.7 }));
+    head.position.y = 1.1; g.add(head);
+    var legL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.25, 0.06), new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.7 }));
+    legL.position.set(-0.08, 0.2, 0); g.add(legL);
+    var legR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.25, 0.06), new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.7 }));
+    legR.position.set(0.08, 0.2, 0); g.add(legR);
+    g.position.set(cx, 0, -6.5);
+    G.scene.add(g);
+
+    var order = { burger: null, fries: 0, drinks: [] };
+    if (Math.random() > 0.25) {
+      var ing = ['steak', 'egg', 'lettuce', 'ketchup', 'mustard'];
+      var cnt = 3 + Math.floor(Math.random() * 2);
+      var its = []; var sauceCount=0;
+      for (var gi = 0; gi < cnt; gi++) {
+        var picked=ing[Math.floor(Math.random()*ing.length)];
+        if(picked==='ketchup'||picked==='mustard'){sauceCount++;if(sauceCount>2){picked=ing[Math.floor(Math.random()*3)];}} // max 2 sauces
+        its.push(picked);
+      }
+      order.burger = its;
+    }
+    order.fries = Math.floor(Math.random() * 3);
+    var dc2 = Math.floor(Math.random() * 3);
+    for (var di = 0; di < dc2; di++) order.drinks.push(Math.random() > 0.5 ? 'cola' : 'sprite');
+    if (!order.burger && !order.fries && !dc2) { order.fries = 1 + Math.floor(Math.random() * 2); order.drinks.push('cola'); }
+    var tot = (order.burger ? 1 : 0) + order.fries + order.drinks.length;
+    while (tot > 6 && order.drinks.length) { order.drinks.pop(); tot--; }
+    while (tot > 6 && order.fries) { order.fries--; tot--; }
+
+    var cust = { group: g, order: order, served: false, dialogued: false, x: cx, talked: false };
+    var zone = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.6), new THREE.MeshBasicMaterial({ visible: false }));
+    zone.position.y = 0.75;
+    zone.userData = { isInteractable: true, isCustomer: true, custIdx: ci };
+    g.add(zone);
+    G.zones.push(zone);
+    G.customers.push(cust);
+  }
+  msg('走到前台跟顾客对话接单', 3000);
+}
+
+function talkTo(cust) {
+  if (cust.served) return;
+  if (!cust.dialogued) {
+    var txt = custTexts[Math.floor(Math.random() * custTexts.length)];
+    msg('顾客: "' + txt + '"', 3000);
+    cust.dialogued = true;
+    var self = cust;
+    setTimeout(function() {
+      G.order = self.order;
+      G.phase = 'playing';
+      showPaper(self.order);
+      msg('📋 接到订单！按 T 查看', 3000);
+    }, 3500);
+    return;
+  }
+  if (cust.dialogued && !cust.served) deliverTo(cust);
+}
+
+function showPaper(order) {
+  var el = document.getElementById('order-paper');
+  var ct = document.getElementById('order-content');
+  var h = '';
+  if (order.burger) {
+    var ns = { steak: '牛排', egg: '煎蛋', lettuce: '生菜', ketchup: '番茄酱', mustard: '芥末酱' };
+    h += '🍔 汉堡: ' + order.burger.map(function(i) { return ns[i]; }).join('+') + '<br>';
+  }
+  if (order.fries) h += '🍟 薯条: ' + order.fries + '份<br>';
+  if (order.drinks.length) {
+    var dn = { cola: '可乐', sprite: '雪碧' };
+    var cc = {};
+    order.drinks.forEach(function(d) { cc[d] = (cc[d] || 0) + 1; });
+    h += '🥤 饮料: ' + Object.keys(cc).map(function(k) { return dn[k] + '×' + cc[k]; }).join(' ');
+  }
+  ct.innerHTML = h;
+  el.style.display = 'block';
+}
+
+function hidePaper() { document.getElementById('order-paper').style.display = 'none'; }
+
+function showResult(success, amount) {
+  if (success) { G.money += amount; document.getElementById('total-earnings').textContent = '💰 累计收入: ' + G.money + '元'; }
+  document.getElementById('result-text').textContent = success ? '✅ 成功！' : '❌ 订单不符';
+  document.getElementById('result-money').textContent = success ? '收入: ' + amount + '元' : '请重新制作';
+  document.getElementById('result-screen').style.display = 'flex';
+}
+
+function hideResult() { document.getElementById('result-screen').style.display = 'none'; }
+
+function newRound() {
+  hideResult();
+  hidePaper();
+  G.phase = 'waiting';
+  G.ass.bBot = 0; G.ass.stk = 0; G.ass.eg = 0; G.ass.lt = 0; G.ass.bTop = 0; G.ass.sc = [];
+  if (G.ass.vis) { G.scene.remove(G.ass.vis); G.ass.vis = null; }
+  if (G.comboOnDesk) { G.scene.remove(G.comboOnDesk); G.comboOnDesk = null; collRemove('comboSolid'); }
+  if (G.tray.mesh) { G.scene.remove(G.tray.mesh); G.tray.mesh = null; G.tray.placed = false; }
+  G.tray.slots.forEach(function(s, i) { if (s) { G.scene.remove(s); G.tray.slots[i] = null; } });
+  G.gSlots.forEach(function(s) { if (s.m) { G.scene.remove(s.m); s.m = 0; s.o = 0; s.s = 'e'; s.ti = 0; s.r = 0; } });
+  G.fSlots.forEach(function(s) { if (s.m) { G.scene.remove(s.m); s.m = 0; s.o = 0; s.s = 'e'; s.ti = 0; s.r = 0; } });
+  spawnCustomers();
+}
+
+function calcPrice(order) {
+  var p = 0;
+  if (order.burger) p += 10 + order.burger.length * 10;
+  p += order.fries * 10;
+  p += order.drinks.length * 5;
+  return p;
+}
+
+function checkOrder(order, burgerRecipe, trayItems) {
+  var ok = true;
+  if (order.burger) {
+    var ca = {}, cb = {};
+    order.burger.forEach(function(x) { ca[x] = (ca[x] || 0) + 1; });
+    if (burgerRecipe) burgerRecipe.forEach(function(x) { cb[x] = (cb[x] || 0) + 1; });
+    if (!burgerRecipe || burgerRecipe.length !== order.burger.length ||
+      !Object.keys(ca).every(function(k) { return ca[k] === cb[k]; }) ||
+      !Object.keys(cb).every(function(k) { return ca[k] === cb[k]; })) ok = false;
+  } else if (burgerRecipe) ok = false;
+  var friesCount = trayItems.filter(function(i) { return i === 'fries'; }).length;
+  if (friesCount !== order.fries) ok = false;
+  var drinksOnTray = trayItems.filter(function(i) { return i === 'cola' || i === 'sprite'; });
+  if (drinksOnTray.length !== order.drinks.length) ok = false;
+  if (ok) {
+    var dc = {}, dc2 = {};
+    order.drinks.forEach(function(d) { dc[d] = (dc[d] || 0) + 1; });
+    drinksOnTray.forEach(function(d) { dc2[d] = (dc2[d] || 0) + 1; });
+    if (Object.keys(dc).some(function(k) { return dc[k] !== dc2[k]; })) ok = false;
+  }
+  return ok;
+}
+
+function deliverTo(cust) {
+  if (G.phase !== 'playing') return;
+  if (!G.tray.placed) { msg('先放托盘和食品'); return; }
+
+  var items = [], burgerRecipe = null;
+  G.tray.slots.forEach(function(s) {
+    if (!s) return;
+    if (s.userData.type === 'burger') { items.push('burger'); burgerRecipe = s.userData.recipe || []; }
+    else if (s.userData.type === 'fries') items.push('fries');
+    else if (s.userData.type === 'cola' || s.userData.type === 'sprite') items.push(s.userData.type);
+  });
+
+  if (!checkOrder(cust.order, burgerRecipe, items)) {
+    msg('订单不符，请重新制作');
+    return;
+  }
+
+  cust.served = true;
+  hidePaper();
+  G.phase = 'delivering';
+
+  // Waiter takes tray
+  var w = createWaiter();
+  w.position.set(cust.x, 0, -6.5);
+  G.scene.add(w);
+  G.waiter = w;
+
+  if (G.tray.mesh) { G.scene.remove(G.tray.mesh); G.tray.mesh = null; }
+  G.tray.slots.forEach(function(s, i) { if (s) { G.scene.remove(s); G.tray.slots[i] = null; } });
+  G.tray.placed = false;
+
+  var price = calcPrice(cust.order);
+  showResult(true, price);
+  G.phase = 'success';
+
+  setTimeout(function() { G.scene.remove(w); G.waiter = null; }, 1500);
+  setTimeout(function() {
+    G.scene.remove(cust.group);
+    cust.group = null;
+    spawnCustomers();
+    G.phase = 'waiting';
+    hideResult();
+    msg('新顾客来了', 3000);
+  }, 4500);
+}
+
+function createWaiter() {
+  var g = new THREE.Group();
+  var bd = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.5, 8), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+  bd.position.y = 0.75; g.add(bd);
+  var hd = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), new THREE.MeshStandardMaterial({ color: 0xf5cba7 }));
+  hd.position.y = 1.1; g.add(hd);
+  var aL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.3, 0.04), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+  aL.position.set(-0.25, 0.85, 0); g.add(aL);
+  var aR = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.3, 0.04), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+  aR.position.set(0.25, 0.85, 0); g.add(aR);
+  var lL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.3, 0.06), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+  lL.position.set(-0.1, 0.25, 0); g.add(lL);
+  var lR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.3, 0.06), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+  lR.position.set(0.1, 0.25, 0); g.add(lR);
+  return g;
+}
+
+// Override the material setting on pointer lock
+// (The setTimeout handles pointer lock after render starts)
+
+</script>
+</body>
+</html>
