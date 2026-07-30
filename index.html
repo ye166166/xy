@@ -350,11 +350,12 @@ function startGame() {
     wt.wrapS = THREE.RepeatWrapping;
     wt.wrapT = THREE.RepeatWrapping;
     wt.repeat.set(6, 6);
-    var floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 36), new THREE.MeshStandardMaterial({ map: wt, roughness: 0.7, metalness: 0 }));
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.z = -13;
-    floor.receiveShadow = true;
-    S.add(floor);
+    // Floor: left main + right-bottom strip (gap at x=8.1~12, z=-6.1~5)
+    var flMat2 = new THREE.MeshStandardMaterial({ map: wt, roughness: 0.7, metalness: 0 });
+    [[-1.95,-13,20.1,36],[10.05,-18.55,3.9,24.9]].forEach(function(a){
+      var f = new THREE.Mesh(new THREE.PlaneGeometry(a[2], a[3]), flMat2);
+      f.rotation.x = -Math.PI/2; f.position.set(a[0], 0, a[1]); f.receiveShadow = true; S.add(f);
+    });
 
     // Walls
     var WM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 });
@@ -364,7 +365,17 @@ function startGame() {
     addWall(7.53, 0.2, 4.335, -6.1);
     addWall(0.2, 12.2, -8.1, 0);
     addWall(0.2, 12.2, 8.1, 0);
+    // Right passage door (hinge at x=8.2, z=-6.1)
+    var rdOpen = false, rdPiv = new THREE.Group(); rdPiv.position.set(8.2, 2, -6.1);
+    var rdMesh = new THREE.Mesh(new THREE.BoxGeometry(1.5, 4, 0.2), WM);
+    rdMesh.position.set(0.75, 0, 0); rdPiv.add(rdMesh);
+    coll(8.2, 9.7, -6.2, -6.0, 'rdSolid');
+    S.add(rdPiv);
+    // Wall from door end to outer wall
+    addWall(2.5, 0.2, 10.85, -6.1);
+    coll(9.5, 12.2, -6.2, -6.0);
     addWall(24, 0.2, 0, 5);
+    addWall(24.2, 0.2, 0, 5.5);
     addWall(24, 0.2, 0, -31.1);
     addWall(0.2, 36.2, -12.1, -13);
     addWall(0.2, 36.2, 12.1, -13);
@@ -375,6 +386,7 @@ function startGame() {
     coll(-8.2, -8.0, -6.2, 6);
     coll(8.0, 8.2, -6.2, 6);
     coll(-12.2, 12.2, 4.85, 5.15);
+    coll(-12.2, 12.2, 5.35, 5.65);
     coll(-12.2, 12.2, -31.25, -30.95);
     coll(-12.25, -12.0, -31.2, 5.2);
     coll(12.0, 12.25, -31.2, 5.2);
@@ -567,6 +579,26 @@ function startGame() {
     dkB.position.y = 0.45; dG.add(dkB);
     S.add(dG); coll(-2.5, 2.5, -9.7, -7.3); mkZone(dG, 5, 0.5, 2.4, 0.5);
 
+    // === TABLES & CHAIRS (1.5x scaled, chairs no back) ===
+    var tTop = new THREE.MeshStandardMaterial({ color: 0xd4a047, roughness: 0.7 });
+    var tLeg = new THREE.MeshStandardMaterial({ color: 0x5a3a1a, roughness: 0.8 });
+    var cMat = new THREE.MeshStandardMaterial({ color: 0x8B5E3C, roughness: 0.7 });
+    [[-6,-15],[-6,-21],[-6,-27],[2,-15],[2,-21],[2,-27],[8,-15],[8,-21]].forEach(function(p){
+      var tX=p[0], tZ=p[1];
+      var table=new THREE.Group();
+      var top=new THREE.Mesh(new THREE.BoxGeometry(1.95,0.09,1.35),tTop);top.position.y=1.17;table.add(top);
+      for(var lx=-0.825;lx<=0.825;lx+=1.65)for(var lz=-0.525;lz<=0.525;lz+=1.05)
+        {var leg=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,1.125,6),tLeg);leg.position.set(lx,0.57,lz);table.add(leg);}
+      table.position.set(tX,0,tZ);S.add(table);coll(tX-1.05,tX+1.05,tZ-0.75,tZ+0.75);
+      [-1.05,1.05].forEach(function(chZ){
+        var chair=new THREE.Group();
+        var seat=new THREE.Mesh(new THREE.BoxGeometry(0.675,0.075,0.675),cMat);seat.position.y=0.63;chair.add(seat);
+        for(var clx=-0.27;clx<=0.27;clx+=0.54)for(var clz=-0.27;clz<=0.27;clz+=0.54)
+          {var cleg=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,0.6,6),tLeg);cleg.position.set(clx,0.3,clz);chair.add(cleg);}
+        chair.position.set(tX,0,tZ+chZ+(chZ>0?0.825:-0.825));S.add(chair);
+      });
+    });
+
     // Bathroom dividing wall + door
     var bDiv = new THREE.Mesh(new THREE.BoxGeometry(1.92, 4, 0.2), new THREE.MeshStandardMaterial({ color: 0xe8e0d8, roughness: 0.8 }));
     bDiv.position.set(-11.04, 2, 1.1); S.add(bDiv);
@@ -652,6 +684,14 @@ function startGame() {
       if (k === 'f') {
         if (G.camera.position.distanceTo(new THREE.Vector3(-6.5, 0, 3.2)) < 2.5) getDrink('right');
         if (G.camera.position.distanceTo(new THREE.Vector3(-9.5, 0, 1.1)) < 2.5) toggleDivDoor();
+        // Right passage door
+        if (G.camera.position.distanceTo(new THREE.Vector3(8.2, 0, -6.1)) < 2.5) {
+          if (!rdOpen) { rdOpen = true; collRemove('rdSolid');
+            var rdSt = performance.now(); !function r1(){ var rt = Math.min((performance.now()-rdSt)/500, 1); rdPiv.rotation.y = -Math.PI/2*rt; if (rt<1) requestAnimationFrame(r1); }();
+          } else { rdOpen = false;
+            var rdSt2 = performance.now(); !function r2(){ var rt2 = Math.min((performance.now()-rdSt2)/500, 1); rdPiv.rotation.y = -Math.PI/2*(1-rt2); if (rt2<1) requestAnimationFrame(r2); else coll(8.2,9.7,-6.2,-6.0,'rdSolid'); }();
+          }
+        }
       }
       if (k === 'x' && !G.paused && (G.phase === 'waiting' || G.phase === 'playing')) { startDialogue(); }
       if (k === 'q' && G.carried) { var isCombo = G.carried.userData.type === 'combo'; dropIt(); msg(isCombo ? '丢掉套餐' : '丢掉食材'); }
@@ -737,6 +777,9 @@ function animate() {
     var zMin = -30;
     G.camera.position.x = Math.max(-12, Math.min(12, G.camera.position.x));
     G.camera.position.z = Math.max(zMin, Math.min(4.8, G.camera.position.z));
+    G.camera.position.y = 1.7;
+    // Pit: player falls through removed floor (x=8.1~12.1, z=-6.1~6.1)
+    if (G.camera.position.x > 8.0 && G.camera.position.x < 12.2 && G.camera.position.z > -6.15 && G.camera.position.z < 6.15) G.camera.position.y = -10;
     G.camera.position.y = 1.7;
   }
 
@@ -1262,12 +1305,16 @@ function deliverCombo(combo) {
 function toggleDivDoor() {
   if (!G.dOpen) {
     G.dOpen = true;
+    collRemove('divDoorSolid');
+    coll(-10.15, -10.05, -0.7, 1.1, 'divDoorSolid'); // rotated 90° along Z
     var st = performance.now();
-    (function d1() { var t = Math.min((performance.now() - st) / 500, 1); G.divPiv.rotation.y = Math.PI / 2 * t; if (t < 1) requestAnimationFrame(d1); })();
+    !function d1(){ var t = Math.min((performance.now()-st)/500, 1); G.divPiv.rotation.y = Math.PI/2*t; if(t<1) requestAnimationFrame(d1); }();
   } else {
     G.dOpen = false;
+    collRemove('divDoorSolid');
+    coll(-10.08, -8.28, 0.95, 1.25, 'divDoorSolid'); // back to doorway position
     var st2 = performance.now();
-    (function d2() { var t2 = Math.min((performance.now() - st2) / 500, 1); G.divPiv.rotation.y = Math.PI / 2 * (1 - t2); if (t2 < 1) requestAnimationFrame(d2); })();
+    !function d2(){ var t2 = Math.min((performance.now()-st2)/500, 1); G.divPiv.rotation.y = Math.PI/2*(1-t2); if(t2<1) requestAnimationFrame(d2); }();
   }
 }
 
