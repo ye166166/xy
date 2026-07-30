@@ -469,13 +469,27 @@ function startGame() {
       if (k === ' ' && G.locked && G.phase === 'success') newRound();
       if (k === ' ' && G.locked && G.phase === 'playing') G.renderer.domElement.requestPointerLock();
       if (k === 'r' && G.phase === 'playing') {
-        // Near packing station → combine tray items OR disassemble combo
         var atPack = G.camera.position.distanceTo(new THREE.Vector3(5.5, 0, -0.5)) < 2.5;
+        // Combine tray items into combo
         if (atPack && G.tray.placed && G.tray.slots.some(function(s){return s!==null;})) { combineCombo(); return; }
-        // Disassemble combo on packing station
-        if (atPack && G.comboOnDesk === null && G.carried && G.carried.userData.type === 'combo') { disassembleComboFromHand(); return; }
-        // Disassemble combo on front desk
-        if (G.comboOnDesk && G.camera.position.distanceTo(G.comboOnDesk.position) < 2.5) { disassembleCombo(); return; }
+        // Pick up combo from front desk
+        if (G.comboOnDesk && G.camera.position.distanceTo(G.comboOnDesk.position) < 6) {
+          G.carried = G.comboOnDesk; G.comboOnDesk = null; collRemove('comboSolid'); msg('拿起套餐'); return;
+        }
+        // Pick up or disassemble combo on packing station
+        if (atPack) {
+          if (G.carried && G.carried.userData.type === 'combo') { disassembleComboFromHand(); return; }
+          // Find combo on packing station surface
+          if (!G.carried) {
+            var children = G.scene.children;
+            for (var ci4=0;ci4<children.length;ci4++) {
+              if (children[ci4].userData && children[ci4].userData.type === 'combo') {
+                var d = G.camera.position.distanceTo(children[ci4].position);
+                if (d < 2.5) { G.carried = children[ci4]; collRemove('comboSolid'); msg('拿起套餐'); return; }
+              }
+            }
+          }
+        }
       }
       if (k === 't' && G.phase === 'playing') {
         var p = document.getElementById('order-paper');
@@ -574,10 +588,11 @@ function animate() {
 
   // Carried item
   if (G.carried) {
-    var off = new THREE.Vector3(0.5, -0.35, -0.85).applyQuaternion(G.camera.quaternion);
+    var isCombo = G.carried.userData.type === 'combo';
+    var off = new THREE.Vector3(isCombo ? -0.3 : 0.5, isCombo ? -0.15 : -0.35, isCombo ? -1.6 : -0.85).applyQuaternion(G.camera.quaternion);
     G.carried.position.copy(G.camera.position).add(off);
     G.carried.quaternion.copy(G.camera.quaternion);
-    var sc = G.carried.userData.type === 'burger' ? 2 : 2.5;
+    var sc = isCombo ? 2.0 : (G.carried.userData.type === 'burger' ? 2 : 2.5);
     G.carried.scale.set(sc, sc, sc);
     G.carried.position.y -= 0.05;
   }
@@ -743,16 +758,7 @@ function handleFryer() {
   if (!G.carried) {
     var r = G.fSlots.find(function(s) { return s.s === 'ready'; });
     if (r) { var m = r.m; r.o = 0; r.m = 0; r.ti = 0; r.s = 'e'; r.r = 0; pickUp(m); return; }
-    var e = G.fSlots.find(function(s) { return !s.o; });
-    if (e) {
-      var cl = cFries(false);
-      var p = e.p;
-      cl.position.set(p[0], 0.63, -3 + p[2]);
-      cl.userData.canPickup = 0;
-      G.scene.add(cl);
-      e.o = 1; e.m = cl; e.ti = 0; e.s = 'cooking'; e.r = 0;
-      msg('生薯条下锅');
-    } else msg('炸锅满了');
+    msg('从薯条柜拿生薯条来炸');
     return;
   }
   msg('不能放这里');
