@@ -906,6 +906,8 @@ function startGame() {
     animate();
     // Request pointer lock after a brief delay to ensure render is ready
     setTimeout(function() { G.renderer.domElement.requestPointerLock(); }, 100);
+    // Click on canvas to hide cursor / request pointer lock
+    G.renderer.domElement.addEventListener('click', function() { G.renderer.domElement.requestPointerLock(); });
     console.log('Game started');
 
   } catch (e) {
