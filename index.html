@@ -304,6 +304,7 @@ var G = {
   day: 1,
   restTimer: 0,
   restActive: false,
+  restInfinite: false,
   eavesdropped: false,
   evesLines: [], evesIdx: 0,
   npcA: null, npcB: null,
@@ -750,7 +751,7 @@ function startGame() {
       var k = e.key.toLowerCase();
       G.keys[k] = true;
 
-      if (k === ' ' && G.locked && G.restActive) { endRestTime(); return; }
+      if (k === ' ' && G.locked && G.restActive && !G.restInfinite) { endRestTime(); return; }
       if (k === ' ' && G.locked && G.phase === 'playing') G.renderer.domElement.requestPointerLock();
       if (k === 'r' && G.paused && chatting) {
         if (skipType) { skipType(); return; }
@@ -778,7 +779,12 @@ function startGame() {
             G.paused = true; chatting = true;
             document.getElementById('dialogue-box').style.display = 'block';
             document.getElementById('dialogue-speaker').textContent = '👤 偷听中...';
-            typewrite(G.evesLines[G.evesIdx], function(){ G.evesIdx++; if(G.evesIdx<G.evesLines.length) showEvesNext(); else {G.evesLines=[];G.evesIdx=0;closeDialogue();} });
+            typewrite(G.evesLines[G.evesIdx], function(){ G.evesIdx++; if(G.evesIdx<G.evesLines.length) showEvesNext(); else {G.evesLines=[];G.evesIdx=0;closeDialogue();
+              // After eavesdrop, show bathroom hint
+              document.getElementById('story-card').innerHTML = '<div style="font-size:45px">去卫生间看一看</div>';
+              document.getElementById('story-card').style.display = 'flex';
+              setTimeout(function(){ document.getElementById('story-card').style.display='none'; document.getElementById('story-card').innerHTML='<div>这是我入职的第一天</div>'; }, 3000);
+            } });
             return;
           }
         }
@@ -967,7 +973,7 @@ function animate() {
   });
 
   // Rest timer countdown
-  if (G.restActive && G.restTimer > 0) {
+  if (G.restActive && G.restTimer > 0 && !G.restInfinite) {
     G.restTimer -= dt;
     var mins = Math.floor(G.restTimer / 60);
     var secs = Math.floor(G.restTimer % 60);
@@ -1464,9 +1470,18 @@ function deliverCombo(combo) {
       }
       if (allServed) {
         if (G.day >= 2) {
-          G.phase = 'resting'; G.restActive = true; G.restTimer = 180;
+          G.phase = 'resting'; G.restActive = true;
+          if (G.day >= 3) { G.restInfinite = true; G.restTimer = 99999; }
+          else { G.restTimer = 180; G.restInfinite = false; }
           document.getElementById('day-hud').style.display = 'block';
-          document.getElementById('day-hud').textContent = '休息时间: 3:00';
+          document.getElementById('day-hud').textContent = G.restInfinite ? '休息时间' : '休息时间: 3:00';
+          if (G.day >= 3) {
+            setTimeout(function() {
+              document.getElementById('story-card').innerHTML = '<div style="font-size:50px">厨房门口有两个人很可疑，去打听一下</div>';
+              document.getElementById('story-card').style.display = 'flex';
+              setTimeout(function(){ document.getElementById('story-card').style.display='none'; document.getElementById('story-card').innerHTML='<div>这是我入职的第一天</div>'; }, 4000);
+            }, 2000);
+          }
           msg('休息时间开始，可以自由闲聊', 3000);
         } else {
           G.day++;
