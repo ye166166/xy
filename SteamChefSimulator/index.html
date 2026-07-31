@@ -39,15 +39,43 @@ canvas{display:block}
 #gameover-screen{position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center}
 #gameover-text{font-size:80px;font-weight:bold;color:#ff0000;text-shadow:0 0 30px rgba(255,0,0,0.8)}
 #gameover-sub{font-size:28px;color:#ccc;margin-top:20px}
+#main-menu{position:fixed;inset:0;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#main-menu .title{font-size:56px;font-weight:bold;color:#ffd700;text-shadow:0 0 30px rgba(255,215,0,0.5);margin-bottom:60px}
+#main-menu .subtitle{font-size:18px;color:#aaa;margin-bottom:30px;margin-top:-40px}
+#main-menu button{width:240px;padding:16px 0;margin:10px;font-size:20px;border:2px solid rgba(255,215,0,0.3);background:rgba(255,255,255,0.05);color:#fff;border-radius:12px;cursor:pointer;transition:.3s}
+#main-menu button:hover{background:rgba(255,215,0,0.15);border-color:#ffd700;transform:scale(1.03)}
+#settings-menu{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:90;display:none;flex-direction:column;align-items:center;justify-content:center}
+#settings-menu .stitle{font-size:42px;color:#ffd700;margin-bottom:40px}
+#settings-menu button{width:260px;padding:14px 0;margin:8px;font-size:18px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:#fff;border-radius:10px;cursor:pointer;transition:.3s}
+#settings-menu button:hover{background:rgba(255,215,0,0.15);border-color:#ffd700}
+#tutorial-panel{position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:110;display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff}
+#tutorial-panel .ttitle{font-size:36px;color:#ffd700;margin-bottom:30px}
+#tutorial-panel .tkeys{font-size:18px;line-height:2.4;text-align:left}
+#tutorial-panel .tkeys span{color:#ffd700;font-weight:bold}
+#tutorial-panel button{margin-top:30px;width:180px;padding:12px 0;font-size:18px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:#fff;border-radius:10px;cursor:pointer}
+#tutorial-panel button:hover{background:rgba(255,215,0,0.15);border-color:#ffd700}
+#confirm-dialog{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:110;display:none;flex-direction:column;align-items:center;justify-content:center}
+#confirm-dialog .cmsg{font-size:22px;color:#fff;margin-bottom:30px;text-align:center;max-width:500px;line-height:1.6}
+#confirm-dialog .cbtns{display:flex;gap:20px}
+#confirm-dialog button{width:140px;padding:12px 0;font-size:17px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:#fff;border-radius:10px;cursor:pointer;transition:.3s}
+#confirm-dialog button:hover{background:rgba(255,215,0,0.15);border-color:#ffd700}
+#confirm-dialog button.yes{background:rgba(255,0,0,0.2);border-color:rgba(255,0,0,0.4)}
+#confirm-dialog button.yes:hover{background:rgba(255,0,0,0.4)}
+#save-list{position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:115;display:none;flex-direction:column;align-items:center;justify-content:center}
+#save-list .sltitle{font-size:36px;color:#ffd700;margin-bottom:20px}
+#save-list .sllist{max-height:350px;overflow-y:auto;width:400px;display:flex;flex-direction:column;gap:8px}
+#save-list .sllist button{width:100%;padding:14px 20px;font-size:17px;text-align:left;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.05);color:#fff;border-radius:10px;cursor:pointer;transition:.2s}
+#save-list .sllist button:hover{background:rgba(255,215,0,0.15);border-color:#ffd700}
+#save-list .slclose{margin-top:18px;width:160px;padding:10px 0;font-size:16px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:#fff;border-radius:10px;cursor:pointer}
+#save-list .slclose:hover{background:rgba(255,215,0,0.12);border-color:#ffd700}
 </style>
 </head>
 <body>
-<div id="blocker"><div id="instructions">🍔 Steam Chef Simulator<br><small>点击或按空格进入游戏</small><br><br>WASD 移动 · 鼠标旋转 · 左键交互 · 右键丢弃</div></div>
 <div id="talk-hint">【按X对话】</div>
 <div id="dialogue-box"><div id="dialogue-speaker"></div><div id="dialogue-text"></div><div id="dialogue-choices"></div></div>
 <div id="message"></div>
 <div id="crosshair">+</div>
-<div id="hint">WASD 行走 · 左键操作 · 右键丢食材 · 空格锁定鼠标</div>
+<div id="hint">WASD 行走 · 左键操作 · 右键丢食材 · 空格锁定 · V 设置 · T 订单</div>
 <div id="total-earnings">💰 累计收入: 0元</div>
 <div id="order-paper"><div class="order-title">📋 今日订单</div><div class="order-content" id="order-content"></div><div class="order-hint">按 T 切换显示</div></div>
 <div id="result-screen"><div id="result-text"></div><div id="result-money"></div></div>
@@ -59,6 +87,8 @@ canvas{display:block}
 </script>
 <script>
 "use strict";
+
+var custColors = [0xff6b6b, 0x6bc5ff, 0xffd93d, 0xa8e6cf, 0xdda0dd, 0xff9f43, 0x6dd5ed, 0xffcccc];
 
 
 // === DIALOGUE SYSTEM ===
@@ -352,6 +382,9 @@ var G = {
   evesLines: [], evesIdx: 0,
   npcA: null, npcB: null,
   oldMan: null, newsAnim: 0,
+  settingsOpen: false,
+  currentSaveKey: null,
+  handlersInit: false,
   doorPiv: null, divPiv: null,
   keys: {}, clock: null
 };
@@ -432,16 +465,286 @@ function dropIt() {
   G.carried = null;
 }
 
-// ===== ENTER GAME =====
-document.getElementById('blocker').addEventListener('click', startGame);
-document.addEventListener('keydown', function(e) {
-  if (e.key === ' ' && !G.init) { e.preventDefault(); startGame(); }
-});
+// ===== SAVE SYSTEM =====
+var SAVE_PREFIX = 'steamChefA_'; // renamed to avoid collision with old saves
+
+// Show main menu at startup
+document.getElementById('main-menu').style.display = 'flex';
+G.init = false;
+
+function getSaveData() {
+  return { day: G.day, phase: G.phase, money: G.money, eavesdropped: G.eavesdropped };
+}
+
+function saveToSlot(key) {
+  localStorage.setItem(key, JSON.stringify(getSaveData()));
+}
+
+function getAllSaves() {
+  var result = [];
+  var prefix = 'steamChef_';
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && k.indexOf(prefix) === 0) {
+      try {
+        var d = JSON.parse(localStorage.getItem(k));
+        result.push({ key: k, day: d.day || 1, money: d.money || 0, phase: d.phase || 'intro', eavesdropped: d.eavesdropped || false });
+      } catch(e) {}
+    }
+  }
+  result.sort(function(a, b) { return a.key < b.key ? -1 : a.key > b.key ? 1 : 0; });
+  return result;
+}
+
+function getLatestSeries() {
+  var saves = getAllSaves();
+  var maxCode = 0;
+  for (var i = 0; i < saves.length; i++) {
+    var s = saves[i].key;
+    // extract series letter: steamChef_A1 -> A, steamChef_AB2 -> AB
+    var m = s.match(/steamChef_([A-Z]+)\d+$/);
+    if (m) {
+      var letters = m[1];
+      var code = 0;
+      for (var j = 0; j < letters.length; j++) code = code * 26 + (letters.charCodeAt(j) - 64);
+      if (code > maxCode) maxCode = code;
+    }
+  }
+  return maxCode;
+}
+
+function codeToSeries(code) {
+  var s = '';
+  while (code > 0) {
+    var r = (code - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    code = Math.floor((code - 1) / 26);
+  }
+  return s || 'A';
+}
+
+function nextSeriesKey() {
+  var code = getLatestSeries() + 1;
+  return 'steamChef_' + codeToSeries(code) + '1';
+}
+
+function getCurrentSeriesVersion(key) {
+  var m = key.match(/steamChef_([A-Z]+)(\d+)$/);
+  return m ? { series: m[1], version: parseInt(m[2]) } : null;
+}
+
+function nextSaveInSeries(key) {
+  var m = getCurrentSeriesVersion(key);
+  if (!m) return 'steamChef_A1';
+  return 'steamChef_' + m.series + (m.version + 1);
+}
+
+function saveGame() {
+  var key = G.currentSaveKey;
+  if (!key) { showConfirm('无法保存：未关联存档系列', function(){}, true); return; }
+  var newKey = nextSaveInSeries(key);
+  G.currentSaveKey = newKey;
+  saveToSlot(newKey);
+  showConfirm('存档 ' + newKey.replace('steamChef_','') + ' 保存成功！', function(){}, true);
+}
+
+function loadGameFromKey(key) {
+  try {
+    var raw = localStorage.getItem(key);
+    if (!raw) { showConfirm('存档不存在', function(){}, true); return; }
+    var data = JSON.parse(raw);
+    // Clean current scene
+    G.paused = false;
+    if (document.pointerLockElement) document.exitPointerLock();
+    if (G.renderer) {
+      if (G.renderer.domElement && G.renderer.domElement.parentNode) G.renderer.domElement.parentNode.removeChild(G.renderer.domElement);
+      G.renderer.dispose();
+    }
+    G.scene = null; G.camera = null; G.renderer = null; G.clock = null;
+    G.boxes = []; G.customers = []; G.zones = [];
+    G.oldMan = null; G.npcA = null; G.npcB = null;
+    G.carried = null; G.tray = {placed:false,mesh:null,slots:[null,null,null,null,null,null]}; G.comboOnDesk = null;
+    G.ass = {bBot:0,stk:0,eg:0,lt:0,bTop:0,sc:[],vis:null};
+    G.loose = []; G.drops = [];
+    G.activeCustomer = null; G.restActive = false; G.restInfinite = false;
+    G.evesLines = []; G.evesIdx = 0;
+    G.settingsOpen = false;
+    G.day = data.day || 1;
+    G.phase = 'ordering';
+    G.money = data.money || 0;
+    G.eavesdropped = data.eavesdropped || false;
+    G.currentSaveKey = key;
+    document.getElementById('total-earnings').textContent = '💰 累计收入: ' + G.money + '元';
+    document.getElementById('main-menu').style.display = 'none';
+    document.getElementById('settings-menu').style.display = 'none';
+    document.getElementById('save-list').style.display = 'none';
+    G.init = false;
+    startGame();
+    setTimeout(function() {
+      if (G.phase !== 'ordering') return;
+      G.renderer.domElement.requestPointerLock();
+      document.getElementById('story-card').innerHTML = '<div style="font-size:50px">第' + G.day + '天</div>';
+      document.getElementById('story-card').style.display = 'flex';
+      setTimeout(function() {
+        document.getElementById('story-card').style.display = 'none';
+        document.getElementById('day-hud').style.display = 'block';
+        G.phase = 'waiting';
+        spawnCustomers();
+        msg('→ 走到前台跟顾客对话接单', 3000);
+      }, 3000);
+    }, 200);
+  } catch(e) {
+    showConfirm('存档损坏，无法读取。', function(){}, true);
+  }
+}
+
+function showSaveList(callback) {
+  var saves = getAllSaves();
+  var container = document.getElementById('save-list-content');
+  container.innerHTML = '';
+  if (saves.length === 0) {
+    container.innerHTML = '<div style="color:#aaa;text-align:center;padding:40px">暂无可用存档</div>';
+  }
+  for (var i = 0; i < saves.length; i++) {
+    (function(key) {
+      var btn = document.createElement('button');
+      btn.textContent = key.replace('steamChef_', '') + ' — 第' + saves[i].day + '天 | $' + saves[i].money;
+      btn.onclick = function() { callback(key); };
+      container.appendChild(btn);
+    })(saves[i].key);
+  }
+  document.getElementById('save-list').style.display = 'flex';
+}
+
+function loadGame() {
+  showSaveList(function(key) {
+    loadGameFromKey(key);
+  });
+}
+
+function newGame() {
+  localStorage.removeItem('steamChefSave'); // clean old single-slot
+  var key = nextSeriesKey();
+  G.init = false;
+  G.day = 1; G.phase = 'ordering'; G.money = 0;
+  G.eavesdropped = false;
+  G.settingsOpen = false;
+  G.currentSaveKey = key;
+  saveToSlot(key); // auto-save initial state
+  document.getElementById('total-earnings').textContent = '💰 累计收入: 0元';
+  document.getElementById('main-menu').style.display = 'none';
+  document.getElementById('settings-menu').style.display = 'none';
+  startGame();
+  setTimeout(function() {
+    if (G.phase !== 'ordering') return;
+    G.renderer.domElement.requestPointerLock();
+    document.getElementById('story-card').style.display = 'flex';
+    setTimeout(function() {
+      document.getElementById('story-card').style.display = 'none';
+      document.getElementById('day-hud').style.display = 'block';
+      G.phase = 'waiting';
+      spawnCustomers();
+      msg('→ 走到前台跟顾客对话接单', 3000);
+    }, 3000);
+  }, 200);
+}
+
+function showTutorial() {
+  document.getElementById('tutorial-panel').style.display = 'flex';
+}
+function closeTutorial() {
+  document.getElementById('tutorial-panel').style.display = 'none';
+}
+
+function openSettings() {
+  if (!G.init) return;
+  G.paused = true;
+  G.settingsOpen = true;
+  document.getElementById('settings-menu').style.display = 'flex';
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
+function closeSettings() {
+  document.getElementById('settings-menu').style.display = 'none';
+  G.paused = false;
+  G.settingsOpen = false;
+  setTimeout(function() { G.renderer.domElement.requestPointerLock(); }, 100);
+}
+
+function askReturnToMenu() {
+  var savedData = getSaveData();
+  var currentData = getSaveData();
+  // Check if current progress matches last save
+  var lastSave = G.currentSaveKey ? localStorage.getItem(G.currentSaveKey) : null;
+  var isSaved = false;
+  if (lastSave) {
+    try { var sd = JSON.parse(lastSave); isSaved = (sd.day === currentData.day && sd.money === currentData.money); } catch(e) {}
+  }
+  if (!isSaved && (currentData.day > 1 || currentData.money > 0)) {
+    showConfirm('当前进度尚未存档，确定要返回主菜单吗？', function() {
+      G.paused = false;
+      closeSettings();
+      returnToMenu();
+    }, false);
+  } else {
+    showConfirm('确定要返回主菜单吗？', function() {
+      G.paused = false;
+      closeSettings();
+      returnToMenu();
+    }, false);
+  }
+}
+
+function returnToMenu() {
+  G.paused = false;
+  if (document.pointerLockElement) document.exitPointerLock();
+  if (G.renderer) {
+    if (G.renderer.domElement && G.renderer.domElement.parentNode) G.renderer.domElement.parentNode.removeChild(G.renderer.domElement);
+    G.renderer.dispose();
+  }
+  G.scene = null; G.camera = null; G.renderer = null; G.clock = null;
+  G.boxes = []; G.customers = []; G.zones = [];
+  G.oldMan = null; G.npcA = null; G.npcB = null;
+  G.carried = null; G.tray = {placed:false,mesh:null,slots:[null,null,null,null,null,null]}; G.comboOnDesk = null;
+  G.ass = {bBot:0,stk:0,eg:0,lt:0,bTop:0,sc:[],vis:null};
+  G.loose = []; G.drops = [];
+  G.activeCustomer = null; G.restActive = false; G.restInfinite = false;
+  G.evesLines = []; G.evesIdx = 0;
+  G.settingsOpen = false;
+  G.currentSaveKey = null;
+  G.init = false;
+  document.getElementById('main-menu').style.display = 'flex';
+  document.getElementById('day-hud').style.display = 'none';
+  document.getElementById('dialogue-box').style.display = 'none';
+  document.getElementById('story-card').style.display = 'none';
+  document.getElementById('order-paper').style.display = 'none';
+  document.getElementById('result-screen').style.display = 'none';
+  document.getElementById('gameover-screen').style.display = 'none';
+  document.getElementById('day-hud').textContent = '第一天，店内仅有一位客人';
+}
+
+function showConfirm(msgText, onYes, singleButton) {
+  document.getElementById('confirm-msg').textContent = msgText;
+  document.getElementById('confirm-dialog').style.display = 'flex';
+  var yesBtn = document.getElementById('confirm-yes');
+  var noBtn = document.getElementById('confirm-no');
+  yesBtn.onclick = function() {
+    document.getElementById('confirm-dialog').style.display = 'none';
+    onYes();
+  };
+  noBtn.style.display = singleButton ? 'none' : 'inline-block';
+  noBtn.onclick = function() {
+    document.getElementById('confirm-dialog').style.display = 'none';
+  };
+}
+
+function closeConfirm() {
+  document.getElementById('confirm-dialog').style.display = 'none';
+}
 
 function startGame() {
   if (G.init) return;
   G.init = true;
-  document.getElementById('blocker').classList.add('hidden');
 
   try {
     // Scene setup
@@ -790,13 +1093,16 @@ function startGame() {
     S.add(tG); mkZone(tG, 0.5, 0.5, 0.5, 0.3);
      coll(7.2, 7.8, -0.75, -0.25);
 
-     // ===== Event Handlers =====
-    document.addEventListener('keydown', function(e) {
+      // ===== Event Handlers (register once) =====
+     if (!G.handlersInit) {
+     G.handlersInit = true;
+     document.addEventListener('keydown', function(e) {
       var k = e.key.toLowerCase();
       G.keys[k] = true;
 
       if (k === ' ' && G.locked && G.restActive && !G.restInfinite) { endRestTime(); return; }
       if (k === ' ' && G.locked && G.phase === 'playing') G.renderer.domElement.requestPointerLock();
+      if (k === 'v' && G.init) { if (!G.settingsOpen) openSettings(); else closeSettings(); return; }
       if (k === 'r' && G.paused && chatting) {
         if (skipType) { skipType(); return; }
         if (chatCallback) { var cb = chatCallback; chatCallback = null; cb(); return; }
@@ -916,7 +1222,7 @@ function startGame() {
 
     document.addEventListener('pointerlockchange', function() {
       G.locked = document.pointerLockElement === G.renderer.domElement;
-      if (G.locked && G.phase === 'ordering') {
+      if (G.locked && G.phase === 'ordering' && G.customers.length===0) {
         document.getElementById('story-card').style.display = 'flex';
         setTimeout(function(){document.getElementById('story-card').style.display='none';document.getElementById('day-hud').style.display='block';G.phase='waiting';spawnCustomers();msg('→ 走到前台跟顾客对话接单',3000);},3000);
       }
@@ -959,17 +1265,18 @@ function startGame() {
     });
     document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
-    // Start animation
-    animate();
-    // Request pointer lock after a brief delay to ensure render is ready
-    setTimeout(function() { G.renderer.domElement.requestPointerLock(); }, 100);
-    // Click on canvas to hide cursor / request pointer lock
     G.renderer.domElement.addEventListener('click', function() { G.renderer.domElement.requestPointerLock(); });
     window.addEventListener('resize', function() {
       G.camera.aspect = window.innerWidth / window.innerHeight;
       G.camera.updateProjectionMatrix();
       G.renderer.setSize(window.innerWidth, window.innerHeight);
     });
+    } // end handlersInit guard
+
+    // Start animation
+    animate();
+    // Request pointer lock after a brief delay to ensure render is ready
+    setTimeout(function() { G.renderer.domElement.requestPointerLock(); }, 100);
     console.log('Game started');
 
   } catch (e) {
@@ -1602,7 +1909,6 @@ function toggleDivDoor() {
 var custTexts = ['今天天气真好啊', '刚下班，饿死了', '听朋友说这家不错', '来个汉堡垫垫肚子',
   '今天想大吃一顿', '随便做点啥都行', '肚子好饿啊～', '好久没吃汉堡了', '有什么推荐的吗',
   '今天心情好，犒劳自己', '快点快点饿死了', '少放点生菜哈', '要辣一点的！'];
-var custColors = [0xff6b6b, 0x6bc5ff, 0xffd93d, 0xa8e6cf, 0xdda0dd, 0xff9f43, 0x6dd5ed, 0xffcccc];
 
 function makeNPC(cx, cz, rotY, color) {
   var g = new THREE.Group();
@@ -1878,5 +2184,48 @@ function createWaiter() {
 
 
 </script>
+<div id="main-menu">
+  <div class="title">🍔 Steam Chef Simulator</div>
+  <div class="subtitle">蒸汽厨师模拟器</div>
+  <button onclick="newGame()">新的游戏</button>
+  <button onclick="loadGame()">读取存档</button>
+  <button onclick="showTutorial()">操作教程</button>
+</div>
+<div id="settings-menu">
+  <div class="stitle">⚙️ 游戏设置</div>
+  <button onclick="saveGame()">保存当前进度</button>
+  <button onclick="loadGame()">读取存档</button>
+  <button onclick="closeSettings()">返回游戏</button>
+  <button onclick="askReturnToMenu()">返回主菜单</button>
+</div>
+<div id="tutorial-panel">
+  <div class="ttitle">📖 操作教程</div>
+  <div class="tkeys">
+    <span>W</span>：人物向前移动<br>
+    <span>S</span>：人物向后移动<br>
+    <span>A</span>：人物向左移动<br>
+    <span>D</span>：人物向右移动<br>
+    <span>鼠标左键</span>：拿起食材、物品<br>
+    <span>Q键</span>：丢弃手中拿着的物品<br>
+    <span>X键</span>：靠近NPC，触发开启对话<br>
+    <span>R键</span>：对话界面中，确认切换下一句台词<br>
+    <span>Z键</span>：隔着墙壁偷听两名顾客聊天<br>
+    <span>V键</span>：打开游戏设置菜单<br>
+    <span>T键</span>：显示 / 隐藏顾客订单面板
+  </div>
+  <button onclick="closeTutorial()">关闭</button>
+</div>
+<div id="confirm-dialog">
+  <div class="cmsg" id="confirm-msg"></div>
+  <div class="cbtns">
+    <button class="yes" id="confirm-yes">是</button>
+    <button id="confirm-no">否</button>
+  </div>
+</div>
+<div id="save-list">
+  <div class="sltitle">📁 存档列表</div>
+  <div class="sllist" id="save-list-content"></div>
+  <button class="slclose" onclick="document.getElementById('save-list').style.display='none'">关闭</button>
+</div>
 </body>
 </html>
