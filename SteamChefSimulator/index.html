@@ -17,15 +17,16 @@ canvas{display:block}
 #crosshair{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:26px;font-weight:bold;text-shadow:1px 1px 2px rgba(0,0,0,0.5);z-index:5;pointer-events:none}
 #hint{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.35);font-size:12px;z-index:5;pointer-events:none;text-align:center}
 #total-earnings{position:fixed;top:18px;right:20px;color:#ffd700;font-size:22px;font-weight:bold;z-index:5;pointer-events:none;text-shadow:2px 2px 4px rgba(0,0,0,0.6)}
-#order-paper{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(245,235,200,0.95);color:#333;padding:30px 40px;border-radius:16px;z-index:20;display:none;min-width:320px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.5)}
-.order-title{font-size:28px;font-weight:bold;margin-bottom:20px}
-.order-content{font-size:20px;line-height:2.2;text-align:left}
-.order-hint{font-size:16px;color:#888;margin-top:20px}
+#order-paper{position:fixed;top:16px;left:16px;background:rgba(245,235,200,0.93);color:#333;padding:20px 24px;border-radius:12px;z-index:20;display:none;min-width:220px;text-align:left;box-shadow:0 4px 20px rgba(0,0,0,0.5)}
+.order-title{font-size:20px;font-weight:bold;margin-bottom:10px}
+.order-content{font-size:15px;line-height:1.9;text-align:left}
+.order-hint{font-size:13px;color:#888;margin-top:10px}
 #result-screen{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:25}
 #result-text{font-size:64px;font-weight:bold;color:#4caf50;text-shadow:2px 2px 8px rgba(0,0,0,0.5)}
 #result-money{font-size:42px;color:#ffd700;margin-top:15px;text-shadow:2px 2px 4px rgba(0,0,0,0.5)}
 #result-sub{font-size:18px;color:#aaa;margin-top:25px}
 #talk-hint{position:fixed;bottom:55px;left:50%;transform:translateX(-50%);color:#fff;font-size:15px;z-index:15;display:none;text-shadow:1px 1px 3px rgba(0,0,0,0.8);pointer-events:none}
+#tooltip{position:fixed;top:53%;left:50%;transform:translate(-50%,0);color:rgba(255,255,255,0.55);font-size:14px;z-index:4;pointer-events:none;text-shadow:1px 1px 2px rgba(0,0,0,0.6)}
 #dialogue-box{position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);color:#fff;padding:22px 35px;z-index:35;display:none;min-height:170px;border-top:2px solid rgba(255,255,255,0.12)}
 #dialogue-speaker{font-size:14px;color:#ffd700;margin-bottom:6px}
 #dialogue-text{font-size:19px;line-height:1.6;min-height:55px}
@@ -36,6 +37,7 @@ canvas{display:block}
 #dialogue-choices button:hover{background:rgba(255,215,0,0.2);border-color:#ffd700}
 #story-card{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:40;display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:36px}
 #day-hud{position:fixed;top:6px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.4);font-size:13px;z-index:5;pointer-events:none;display:none}
+#time-label{position:fixed;top:10px;left:16px;color:rgba(255,255,255,0.5);font-size:15px;z-index:5;pointer-events:none}
 #gameover-screen{position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center}
 #gameover-text{font-size:80px;font-weight:bold;color:#ff0000;text-shadow:0 0 30px rgba(255,0,0,0.8)}
 #gameover-sub{font-size:28px;color:#ccc;margin-top:20px}
@@ -54,7 +56,7 @@ canvas{display:block}
 #tutorial-panel .tkeys span{color:#ffd700;font-weight:bold}
 #tutorial-panel button{margin-top:30px;width:180px;padding:12px 0;font-size:18px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:#fff;border-radius:10px;cursor:pointer}
 #tutorial-panel button:hover{background:rgba(255,215,0,0.15);border-color:#ffd700}
-#confirm-dialog{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:110;display:none;flex-direction:column;align-items:center;justify-content:center}
+#confirm-dialog{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:120;display:none;flex-direction:column;align-items:center;justify-content:center}
 #confirm-dialog .cmsg{font-size:22px;color:#fff;margin-bottom:30px;text-align:center;max-width:500px;line-height:1.6}
 #confirm-dialog .cbtns{display:flex;gap:20px}
 #confirm-dialog button{width:140px;padding:12px 0;font-size:17px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:#fff;border-radius:10px;cursor:pointer;transition:.3s}
@@ -75,12 +77,14 @@ canvas{display:block}
 <div id="dialogue-box"><div id="dialogue-speaker"></div><div id="dialogue-text"></div><div id="dialogue-choices"></div></div>
 <div id="message"></div>
 <div id="crosshair">+</div>
+<div id="tooltip"></div>
 <div id="hint">WASD 行走 · 左键操作 · 右键丢食材 · 空格锁定 · V 设置 · T 订单</div>
 <div id="total-earnings">💰 累计收入: 0元</div>
 <div id="order-paper"><div class="order-title">📋 今日订单</div><div class="order-content" id="order-content"></div><div class="order-hint">按 T 切换显示</div></div>
 <div id="result-screen"><div id="result-text"></div><div id="result-money"></div></div>
 <div id="story-card"><div>这是我入职的第一天</div></div>
-<div id="day-hud">第一天，店内仅有一位客人</div>
+<div id="day-hud"></div>
+<div id="time-label"></div>
 <div id="gameover-screen"><div id="gameover-text">Game Over</div><div id="gameover-sub">专心烹饪</div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js">
@@ -242,6 +246,8 @@ function eavesdrop(text) {
 function showEvesNext() {
   document.getElementById('dialogue-speaker').textContent = '👤 偷听中...';
   typewrite(G.evesLines[G.evesIdx], function(){ G.evesIdx++; if(G.evesIdx<G.evesLines.length) showEvesNext(); else {G.evesLines=[];G.evesIdx=0;closeDialogue();G.eavesdropped=true;
+    if(G.npcA&&G.npcA.userData.npcSprite)G.scene.remove(G.npcA.userData.npcSprite);
+    if(G.npcB&&G.npcB.userData.npcSprite)G.scene.remove(G.npcB.userData.npcSprite);
     document.getElementById('story-card').innerHTML='<div style="font-size:45px">去卫生间看一看</div>';
     document.getElementById('story-card').style.display='flex';
     setTimeout(function(){document.getElementById('story-card').style.display='none';document.getElementById('story-card').innerHTML='<div>这是我入职的第一天</div>';},3000);
@@ -332,7 +338,6 @@ function endRestTime() {
     G.fSlots.forEach(function(s){if(s.m){G.scene.remove(s.m);s.m=0;s.o=0;s.s='e';s.ti=0;s.r=0;}});
     spawnCustomers();
     G.activeCustomer = null;
-    document.getElementById('day-hud').textContent = '第一天，店内仅有一位客人';
   }, 2500);
 }
 
@@ -603,17 +608,64 @@ function showSaveList(callback) {
   var container = document.getElementById('save-list-content');
   container.innerHTML = '';
   if (saves.length === 0) {
-    container.innerHTML = '<div style="color:#aaa;text-align:center;padding:40px">暂无可用存档</div>';
+    container.innerHTML = '<div style="color:#aaa;text-align:center;padding:40px">暂无可用存档<br><small style="font-size:13px">鼠标左键加载 · 右键删除</small></div>';
   }
   for (var i = 0; i < saves.length; i++) {
-    (function(key) {
+    (function(key, displayLabel) {
       var btn = document.createElement('button');
-      btn.textContent = key.replace('steamChef_', '') + ' — 第' + saves[i].day + '天 | $' + saves[i].money;
-      btn.onclick = function() { callback(key); };
+      btn.textContent = displayLabel;
+      btn.onclick = function(e) {
+        // Left click: load with confirmation for subsequent saves
+        loadWithCheck(key, callback);
+      };
+      btn.oncontextmenu = function(e) {
+        e.preventDefault();
+        // Right click: delete this and subsequent saves
+        showConfirm('是否删除存档 ' + displayLabel.split(' —')[0] + ' 及该系列后续所有存档？', function() {
+          deleteSaveSeries(key);
+          showSaveList(callback);
+        }, false);
+      };
       container.appendChild(btn);
-    })(saves[i].key);
+    })(saves[i].key, saves[i].key.replace('steamChef_', '') + ' — 第' + saves[i].day + '天 | $' + saves[i].money);
   }
   document.getElementById('save-list').style.display = 'flex';
+}
+
+function deleteSaveSeries(key) {
+  var m = getCurrentSeriesVersion(key);
+  if (!m) return;
+  var series = m.series;
+  var ver = m.version;
+  var allSaves = getAllSaves();
+  for (var i = 0; i < allSaves.length; i++) {
+    var sm = getCurrentSeriesVersion(allSaves[i].key);
+    if (sm && sm.series === series && sm.version >= ver) {
+      localStorage.removeItem(allSaves[i].key);
+    }
+  }
+}
+
+function hasSubsequentSaves(key) {
+  var m = getCurrentSeriesVersion(key);
+  if (!m) return false;
+  var allSaves = getAllSaves();
+  for (var i = 0; i < allSaves.length; i++) {
+    var sm = getCurrentSeriesVersion(allSaves[i].key);
+    if (sm && sm.series === m.series && sm.version > m.version) return true;
+  }
+  return false;
+}
+
+function loadWithCheck(key, callback) {
+  if (hasSubsequentSaves(key)) {
+    showConfirm('是否回到该存档？回到该存档后，该系列后续存档将被删除。', function() {
+      deleteSaveSeries(key);
+      callback(key);
+    }, false);
+  } else {
+    callback(key);
+  }
 }
 
 function loadGame() {
@@ -720,7 +772,6 @@ function returnToMenu() {
   document.getElementById('order-paper').style.display = 'none';
   document.getElementById('result-screen').style.display = 'none';
   document.getElementById('gameover-screen').style.display = 'none';
-  document.getElementById('day-hud').textContent = '第一天，店内仅有一位客人';
 }
 
 function showConfirm(msgText, onYes, singleButton) {
@@ -923,12 +974,12 @@ function startGame() {
       return g;
     }
 
-    var cabSteak = cab(-6.5, -4, new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.04, 0.04), mSR));
-    var cabEgg = cab(-6.5, -2.8, new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), mER));
-    var cabLett = cab(-6.5, -1.6, (function() { var m = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), mLT); m.scale.set(1.3, 0.5, 0.9); return m; })());
-    var cabFries = cab(-6.5, -0.4, new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.14, 0.04), mFR));
-    var cabBB = cab(-6.5, 0.8, (function() { var g = new THREE.Group(); var d = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), mB); d.scale.y = 0.5; g.add(d); return g; })());
-    var cabTB = cab(-6.5, 2, (function() { var g = new THREE.Group(); var b = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.09, 0.02, 12), mB); g.add(b); var d = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), mB); d.position.y = 0.02; g.add(d); return g; })());
+    var cabSteak = cab(-6.5, -4, new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.04, 0.04), mSR)); G.cSteak = cabSteak;
+    var cabEgg = cab(-6.5, -2.8, new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), mER)); G.cEgg = cabEgg;
+    var cabLett = cab(-6.5, -1.6, (function() { var m = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), mLT); m.scale.set(1.3, 0.5, 0.9); return m; })()); G.cLett = cabLett;
+    var cabFries = cab(-6.5, -0.4, new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.14, 0.04), mFR)); G.cFries = cabFries;
+    var cabBB = cab(-6.5, 0.8, (function() { var g = new THREE.Group(); var d = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), mB); d.scale.y = 0.5; g.add(d); return g; })()); G.cBB = cabBB;
+    var cabTB = cab(-6.5, 2, (function() { var g = new THREE.Group(); var b = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.09, 0.02, 12), mB); g.add(b); var d = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), mB); d.position.y = 0.02; g.add(d); return g; })()); G.cTB = cabTB;
 
     // Cooler  
     var fg = new THREE.Group(); fg.position.set(-6.5, 0, 3.2);
@@ -937,7 +988,9 @@ function startGame() {
     [-0.34, 0.34].forEach(function(z) { var w = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.28, 0.04), cm); w.position.set(0, 0.17, z); fg.add(w); });
     [-0.43, 0.43].forEach(function(x) { var w = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.28, 0.7), cm); w.position.set(x, 0.17, 0); fg.add(w); });
     var fgL = new THREE.Group(); fgL.position.set(-6.5, 0, 3.2);
+    G.pCoolL = fgL;
     var fgR = new THREE.Group(); fgR.position.set(-6.5, 0, 3.2);
+    G.pCoolR = fgR;
     var gm = new THREE.MeshStandardMaterial({ color: 0x44ee44, roughness: 0.3 });
     var rm = new THREE.MeshStandardMaterial({ color: 0xdd2222, roughness: 0.3 });
     for (var i = 0; i < 3; i++) {
@@ -955,6 +1008,7 @@ function startGame() {
 
     // Grill
     var gG = new THREE.Group(); gG.position.set(-3, 0, -3);
+    G.gGrill = gG;
     mkCount(gG, 1.8, 1.6, 0x666666);
     var pan = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.06, 1.4), mD);
     pan.position.y = 0.53; gG.add(pan);
@@ -969,6 +1023,7 @@ function startGame() {
 
     // Fryer
     var fG = new THREE.Group(); fG.position.set(0, 0, -3);
+    G.fFryer = fG;
     mkCount(fG, 1.8, 1.6, 0x666666);
     var bb = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.2, 20), mD);
     bb.position.y = 0.5; fG.add(bb);
@@ -985,12 +1040,14 @@ function startGame() {
 
     // Assembly
     var aG = new THREE.Group(); aG.position.set(3.2, 0, -3);
+    G.aAssy = aG;
     mkCount(aG, 1.8, 1.6, 0x999999);
     S.add(aG); mkZone(aG, 1.8, 0.7, 1.6, 0.5);
     coll(2.3, 4.1, -3.8, -2.2);
 
     // Prep
     var pG = new THREE.Group(); pG.position.set(5.5, 0, 1.5);
+    G.pPrep = pG;
     mkCount(pG, 1.4, 0.8, 0x777777);
     var kM = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.14, 0.07), new THREE.MeshStandardMaterial({ color: 0xcc1111, roughness: 0.3 }));
     kM.position.set(-0.2, 0.57, 0); pG.add(kM);
@@ -1001,12 +1058,14 @@ function startGame() {
 
     // Packing
     var pkG = new THREE.Group(); pkG.position.set(5.5, 0, -0.5);
+    G.pPack = pkG;
     mkCount(pkG, 2.6, 3.2, 0x777777);
     S.add(pkG); mkZone(pkG, 2.6, 0.7, 3.2, 0.5);
     coll(4.2, 6.8, -2.1, 1.1);
 
     // Tray cabinet
     var tC = new THREE.Group(); tC.position.set(7.2, 0, -2.5);
+    G.pTray = tC;
     mkCount(tC, 0.6, 0.6, 0x8B5E3C);
     var tB = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.5), woods);
     tB.position.y = 0.55; tC.add(tB);
@@ -1019,6 +1078,7 @@ function startGame() {
 
     // Front desk (extended Z)
     var dG = new THREE.Group(); dG.position.set(0, 0, -8.5);
+    G.pDesk = dG;
     var dkT = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.08, 2.4), new THREE.MeshStandardMaterial({ color: 0xfafafa, roughness: 0.5 }));
     dkT.position.y = 0.96; dG.add(dkT);
     var dkB = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.9, 2.1), new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.6 }));
@@ -1086,6 +1146,7 @@ function startGame() {
 
     // Trash can
     var tG = new THREE.Group(); tG.position.set(7.5, 0, -0.5);
+    G.pTrash = tG;
     var trashB = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.5), new THREE.MeshStandardMaterial({ color: 0x6b4226, roughness: 0.9 }));
     trashB.position.y = 0.2; tG.add(trashB);
     var trashL = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.05, 0.55), new THREE.MeshStandardMaterial({ color: 0x5a3520, roughness: 0.9 }));
@@ -1130,6 +1191,8 @@ function startGame() {
             document.getElementById('dialogue-box').style.display = 'block';
             document.getElementById('dialogue-speaker').textContent = '👤 偷听中...';
               typewrite(G.evesLines[G.evesIdx], function(){ G.evesIdx++; if(G.evesIdx<G.evesLines.length) showEvesNext(); else {G.evesLines=[];G.evesIdx=0;closeDialogue();G.eavesdropped=true;
+               if(G.npcA&&G.npcA.userData.npcSprite)G.scene.remove(G.npcA.userData.npcSprite);
+               if(G.npcB&&G.npcB.userData.npcSprite)G.scene.remove(G.npcB.userData.npcSprite);
                document.getElementById('story-card').innerHTML='<div style="font-size:45px">去卫生间看一看</div>';
                document.getElementById('story-card').style.display='flex';
                setTimeout(function(){document.getElementById('story-card').style.display='none';document.getElementById('story-card').innerHTML='<div>这是我入职的第一天</div>';},3000);
@@ -1205,7 +1268,7 @@ function startGame() {
       }
       if (k === 'f') {
         if (G.camera.position.distanceTo(new THREE.Vector3(-6.5, 0, 3.2)) < 2.5) getDrink('right');
-        if (G.camera.position.distanceTo(new THREE.Vector3(-9.5, 0, 1.1)) < 2.5) toggleDivDoor();
+        if (G.camera.position.distanceTo(new THREE.Vector3(-10.08, 0, 1.1)) < 2.3) toggleDivDoor();
         // Right passage door
         if (G.camera.position.distanceTo(new THREE.Vector3(8.2, 0, -6.1)) < 2.5) {
           if (!rdOpen) { rdOpen = true; collRemove('rdSolid');
@@ -1238,22 +1301,22 @@ function startGame() {
       if (!G.locked) return;
       if (e.button === 0) {
         var st = getStation();
-        if (st === gG) handleGrill();
-        else if (st === fG) handleFryer();
-        else if (st === aG) handleAss();
-        else if (st === pG) handlePrep();
-        else if (st === cabSteak) handleCab('steak');
-        else if (st === cabEgg) handleCab('egg');
-        else if (st === cabLett) handleCab('lettuce');
-        else if (st === cabFries) handleCab('fries');
-        else if (st === cabBB) handleCab('bun_bot');
-        else if (st === cabTB) handleCab('bun_top');
-        else if (st === fgL) getDrink('left');
-        else if (st === fgR) getDrink('right');
-        else if (st === tG) handleTrash();
-        else if (st === pkG) handlePack();
-        else if (st === tC) handleTray();
-        else if (st === dG) { if (G.carried && G.carried.userData.type === 'combo') deliverCombo(G.carried); else msg('想把套餐放这里? 先去后厨制作'); }
+        if (st === G.gGrill) handleGrill();
+        else if (st === G.fFryer) handleFryer();
+        else if (st === G.aAssy) handleAss();
+        else if (st === G.pPrep) handlePrep();
+        else if (st === G.cSteak) handleCab('steak');
+        else if (st === G.cEgg) handleCab('egg');
+        else if (st === G.cLett) handleCab('lettuce');
+        else if (st === G.cFries) handleCab('fries');
+        else if (st === G.cBB) handleCab('bun_bot');
+        else if (st === G.cTB) handleCab('bun_top');
+        else if (st === G.pCoolL) getDrink('left');
+        else if (st === G.pCoolR) getDrink('right');
+        else if (st === G.pTrash) handleTrash();
+        else if (st === G.pPack) handlePack();
+        else if (st === G.pTray) handleTray();
+        else if (st === G.pDesk) { if (G.carried && G.carried.userData.type === 'combo') deliverCombo(G.carried); else msg('想把套餐放这里? 先去后厨制作'); }
         else {
           var found = false;
           for (var i = 0; i < G.customers.length; i++) {
@@ -1348,8 +1411,15 @@ function animate() {
     G.restTimer -= dt;
     var mins = Math.floor(G.restTimer / 60);
     var secs = Math.floor(G.restTimer % 60);
-    document.getElementById('day-hud').textContent = '休息时间: ' + mins + ':' + (secs < 10 ? '0' : '') + secs;
+    document.getElementById('day-hud').textContent = '休息时间: ' + mins + ':' + (secs < 10 ? '0' : '') + secs + '  (按空格结束当天)';
     if (G.restTimer <= 0) { endRestTime(); }
+  }
+  if (G.restActive && G.restInfinite) {
+    document.getElementById('day-hud').textContent = '休息时间';
+  }
+  // Time of day indicator
+  if (G.init) {
+    document.getElementById('time-label').textContent = G.restActive ? '🌙 夜晚' : '☀️ 白天';
   }
   // Old man newspaper animation
   if (G.oldMan && !G.paused) {
@@ -1378,6 +1448,45 @@ function animate() {
     }
     document.getElementById('talk-hint').style.display = hitsCrosshair ? 'block' : 'none';
   }
+
+  // Station interaction hints (tooltip below crosshair)
+  if (!G.paused && G.init) {
+    var stationHints = [
+      { x: 0, z: -3, r: 1.0, label: '炸薯条操作台' },
+      { x: -3, z: -3, r: 1.0, label: '煎制牛肉饼操作台' },
+      { x: 3.2, z: -3, r: 1.0, label: '汉堡拼装工作台' },
+      { x: 5.5, z: 1.5, r: 0.8, label: '酱料台' },
+      { x: 5.5, z: -0.5, r: 1.5, label: '包装台' },
+      { x: 7.2, z: -2.5, r: 0.4, label: '托盘箱' },
+      { x: 0, z: -8.5, r: 2.5, label: '前台' },
+      { x: -6.5, z: 3.2, r: 0.6, label: '饮料箱' },
+      { x: -6.5, z: -4, r: 0.35, label: '牛排食物柜' },
+      { x: -6.5, z: -2.8, r: 0.35, label: '鸡蛋食物柜' },
+      { x: -6.5, z: -1.6, r: 0.35, label: '生菜食物柜' },
+      { x: -6.5, z: -0.4, r: 0.35, label: '薯条食物柜' },
+      { x: -6.5, z: 0.8, r: 0.35, label: '底层面包食物柜' },
+      { x: -6.5, z: 2, r: 0.35, label: '顶层面包食物柜' },
+      { x: -10.08, z: 1.1, r: 1.5, label: '按下F推开洗手间房门' },
+      { x: 7.5, z: -0.5, r: 0.4, label: '垃圾桶' }
+    ];
+    var px = G.camera.position.x, pz = G.camera.position.z;
+    var bestDist = Infinity, bestLabel = '', bestIdx = -1, tie = false;
+    for (var si = 0; si < stationHints.length; si++) {
+      var s = stationHints[si];
+      var d = Math.sqrt((px - s.x) * (px - s.x) + (pz - s.z) * (pz - s.z)) - s.r;
+      if (d < 0.5) {
+        if (Math.abs(d - bestDist) < 0.005) { tie = true; }
+        else if (d < bestDist) { bestDist = d; bestLabel = s.label; bestIdx = si; tie = false; }
+      }
+    }
+    var toolEl = document.getElementById('tooltip');
+    if (bestIdx >= 0 && !tie) {
+      toolEl.textContent = bestLabel;
+    } else {
+      toolEl.textContent = '';
+    }
+  }
+
   // Customer walk to destination
   if (!G.paused && G.customers.length > 0) {
     for (var ci=0; ci<G.customers.length; ci++) {
@@ -1927,6 +2036,7 @@ function makeNPC(cx, cz, rotY, color) {
   var qTex = new THREE.CanvasTexture(qCanvas);
   var qSprite = new THREE.Sprite(new THREE.SpriteMaterial({map:qTex,transparent:true,depthTest:false,depthWrite:false}));
   qSprite.position.set(cx, 3.0, cz); qSprite.scale.set(1.0,1.0,1); G.scene.add(qSprite);
+  g.userData.npcSprite = qSprite;
   var zone = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.6), new THREE.MeshBasicMaterial({ visible: false }));
   zone.position.y = 0.75; zone.userData = { isInteractable: true, isNPC: true }; g.add(zone); G.zones.push(zone);
   return g;
