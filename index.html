@@ -43,7 +43,7 @@ canvas{display:block}
 </head>
 <body>
 <div id="blocker"><div id="instructions">🍔 Steam Chef Simulator<br><small>点击或按空格进入游戏</small><br><br>WASD 移动 · 鼠标旋转 · 左键交互 · 右键丢弃</div></div>
-<div id="talk-hint">【按 X 进行对话】</div>
+<div id="talk-hint">【按X对话】</div>
 <div id="dialogue-box"><div id="dialogue-speaker"></div><div id="dialogue-text"></div><div id="dialogue-choices"></div></div>
 <div id="message"></div>
 <div id="crosshair">+</div>
@@ -98,11 +98,19 @@ function startDialogue(cust) {
   if (chatCust.served) {
     if (G.phase === 'resting') typewrite('有什么事吗？', function() { showChatChoices(); });
     else typewrite(chatBrief[Math.floor(Math.random()*chatBrief.length)], null);
-  } else if (G.activeCustomer && chatCust === G.activeCustomer) {
+  } else if (G.activeCustomer && !G.activeCustomer.served && chatCust === G.activeCustomer) {
     typewrite('你的订单还要多久啊？', function() { showBusyChoices(); });
+  } else if (G.activeCustomer && !G.activeCustomer.served && chatCust.isOrdering && !chatCust.dialogued) {
+    typewrite('什么时候到我？', function() { showBusyChoices(); });
   } else if (!chatCust.dialogued && chatCust.isOrdering) {
-    var txt = chatLines[Math.floor(Math.random() * chatLines.length)];
-    typewrite(txt, function() { showChoices(); });
+    if (Math.random() < 0.6) {
+      // 60% chance: direct order
+      typewrite('我想点这些，麻烦快一点哦！', null);
+      chatCust._directOrder = true;
+    } else {
+      var txt = chatLines[Math.floor(Math.random() * chatLines.length)];
+      typewrite(txt, function() { showChoices(); });
+    }
   } else if (!chatCust.dialogued) {
     if (G.phase === 'resting') typewrite('有什么事吗？', function() { showChatChoices(); });
     else typewrite(chatBrief[Math.floor(Math.random()*chatBrief.length)], null);
@@ -133,7 +141,7 @@ function selectBusy(op) {
   document.getElementById('dialogue-choices').style.display = 'none';
   document.removeEventListener('keydown', onBusyKey);
   if (op === '再见') { closeDialogue(); return; }
-  typewrite(op === '马上就好' ? '好的，稍等一下哦～' : '好的，那你先忙吧～', null);
+  typewrite(op === '马上就好' || op === '马上' ? '好的，等你哦～' : '好的，那你先忙吧～', null);
 }
 
 function typewrite(text, callback) {
@@ -188,6 +196,23 @@ function selectChoice(choice) {
 var chatJokes = ['小白加小白等于什么？等于小白兔（小白two），好笑吧哈哈。','有一天火柴头浑身发痒，挠着挠着，自己把自己点着了。','海水为什么是蓝色的？因为小鱼一直在吐泡泡，布鲁布鲁（blue blue）。','从前有个人钓鱼，钓上来一只鱿鱼，鱿鱼苦苦哀求别烤了它，那人说行，考你几个问题就行，鱿鱼当场崩溃：别考别考！','你晓得布和纸最怕什么吗？不怕一万只怕万一，不（布）怕一万，只（纸）怕万一哟。','为什么大雁冬天要往南边飞？因为走过去太慢啦，当然要飞着走才行。','一颗玉米走在路上觉得太热，走着走着它就变成爆米花了。'];
 var chatLores = ['我听说这家店收留过不少弄丢过往的人，在这里安安稳稳过日子，比在外颠沛流离舒服太多了。','看你处理食材的动作干脆利落，下手精准又沉稳，寻常打工的店员可练不出这种本事。','这家老店看着平平无奇，背地里藏着不少没人知晓的秘密，尤其是店铺往后的位置，可不简单。','偶尔深夜路过店铺后面，总能隐约听见细碎动静，总觉得那片墙后面藏着东西。'];
 var chatBrief = ['我在等人呢。','这会儿忙，待会再说。','先看看菜单再说。','这里环境不错啊。','闻着好香～','今天人挺多的嘛。','坐会儿休息下。'];
+
+function typewriteNPC(text, callback) {
+  document.getElementById('dialogue-text').innerHTML = text.replace(/\\n/g,'<br>') + '<br><small style="color:#888">按 R 结束聊天</small>';
+  chatCallback = callback || function(){closeDialogue();};
+}
+
+function eavesdrop(text) {
+  G.paused = true; chatting = true;
+  document.getElementById('dialogue-box').style.display = 'block';
+  document.getElementById('dialogue-speaker').textContent = '👤 偷听中...';
+  typewriteNPC(text, null);
+}
+
+function showEvesNext() {
+  document.getElementById('dialogue-speaker').textContent = '👤 偷听中...';
+  typewrite(G.evesLines[G.evesIdx], function(){ G.evesIdx++; if(G.evesIdx<G.evesLines.length) showEvesNext(); else {G.evesLines=[];G.evesIdx=0;closeDialogue();} });
+}
 
 function showChatChoices() {
   var container = document.getElementById('dialogue-choices');
@@ -245,12 +270,15 @@ function closeDialogue() {
   chatCallback = null;
   skipType = null;
   if (chatCust && !chatCust.dialogued && chatCust.isOrdering) {
-    chatCust.dialogued = true;
-    G.activeCustomer = chatCust;
-    G.order = chatCust.order;
-    G.phase = 'playing';
-    showPaper(chatCust.order);
-    msg('📋 接到订单！按 T 查看', 3000);
+    // Only set as active if no other active customer
+    if (!G.activeCustomer || G.activeCustomer.served) {
+      chatCust.dialogued = true;
+      G.activeCustomer = chatCust;
+      G.order = chatCust.order;
+      G.phase = 'playing';
+      showPaper(chatCust.order);
+      msg('📋 接到订单！按 T 查看', 3000);
+    }
   }
 }
 
@@ -276,6 +304,9 @@ var G = {
   day: 1,
   restTimer: 0,
   restActive: false,
+  eavesdropped: false,
+  evesLines: [], evesIdx: 0,
+  npcA: null, npcB: null,
   doorPiv: null, divPiv: null,
   keys: {}, clock: null
 };
@@ -726,44 +757,48 @@ function startGame() {
         if (chatCallback) { var cb = chatCallback; chatCallback = null; cb(); return; }
         return;
       }
-      if (k === 'r' && (G.phase === 'playing' || G.phase === 'waiting' || G.phase === 'resting')) {
-        // Customer dialogue - check nearest arrived customer
-        if (G.customers.length > 0) {
-          var nearC = null; var nearD = 999;
-          for (var ci5=0; ci5<G.customers.length; ci5++) {
-            var c5 = G.customers[ci5];
-            if (c5.arrived && !c5.served && c5.group) {
-              var d5 = G.camera.position.distanceTo(c5.group.position);
-              if (d5 < 4 && d5 < nearD) { nearC = c5; nearD = d5; }
-            }
+      // NPC eavesdropping (Z key, z between -6 and -4, x 1-8)
+      if (k === 'z' && !G.paused && G.npcA && G.npcB) {
+        var inZone = G.camera.position.x>1 && G.camera.position.x<8 && G.camera.position.z>-6 && G.camera.position.z<-4;
+        if (inZone) {
+          if (!G.evesLines.length) {
+            G.evesLines = [
+              '顾客A：你最近有没有留意这家汉堡店不对劲？',
+              '顾客A：前几天深夜我路过后门，隐约看见有个陌生男人总往厕所方向来回转悠，看着神神秘秘的。',
+              '顾客B：我也察觉到了！那人来了好几天了，白天基本不露面。',
+              '顾客B：一到夜里就躲在店铺角落，老板好像还特意给他留了方便进出的路子。',
+              '顾客A：怪不得店里总透着古怪，原来厕所里面藏着这么一位神秘人。',
+              '顾客A：也不知道那人到底是什么来头。',
+              '顾客B：咱们小声点说，可千万别被店里的伙计听见。',
+              '顾客B：免得惹上不必要的麻烦。'
+            ];
+            G.evesIdx = 0;
           }
-          if (nearC) { startDialogue(nearC); return; }
+          if (G.evesIdx < G.evesLines.length) {
+            G.paused = true; chatting = true;
+            document.getElementById('dialogue-box').style.display = 'block';
+            document.getElementById('dialogue-speaker').textContent = '👤 偷听中...';
+            typewrite(G.evesLines[G.evesIdx], function(){ G.evesIdx++; if(G.evesIdx<G.evesLines.length) showEvesNext(); else {G.evesLines=[];G.evesIdx=0;closeDialogue();} });
+            return;
+          }
+        }
+        // Direct talk with NPCs (anywhere)
+        if (!inZone && !G.paused && G.camera.position.distanceTo(G.npcA.position) < 4) {
+          typewriteNPC('别凑过来，我们俩正在私下聊天呢，你可别偷听哦', null);
+          G.paused = true; chatting = true;
+          document.getElementById('dialogue-box').style.display = 'block';
+          document.getElementById('dialogue-speaker').textContent = '👤 顾客'; return;
         }
       }
-      if (k === 'x' && !G.paused && (G.phase === 'waiting' || G.phase === 'playing' || G.phase === 'resting')) {
-        // X key: chat with any nearby customer
-        var xNear = null; var xDist = 999;
-        for (var xi=0; xi<G.customers.length; xi++) {
-          if (G.customers[xi].served && G.phase !== 'resting') continue;
-          if (!G.customers[xi].served && G.customers[xi].group) {
-            var xd = G.camera.position.distanceTo(G.customers[xi].group.position);
-            if (xd < 4 && xd < xDist) { xNear = G.customers[xi]; xDist = xd; }
-          }
-        }
-        if (xNear) { startDialogue(xNear); }
-      }
+      // R key combo actions (playing phase only)
       if (k === 'r' && G.phase === 'playing') {
         var atPack = G.camera.position.distanceTo(new THREE.Vector3(5.5, 0, -0.5)) < 2.5;
-        // Combine tray items into combo
         if (atPack && G.tray.placed && G.tray.slots.some(function(s){return s!==null;})) { combineCombo(); return; }
-        // Pick up combo from front desk
         if (G.comboOnDesk && G.camera.position.distanceTo(G.comboOnDesk.position) < 6) {
           G.carried = G.comboOnDesk; G.comboOnDesk = null; collRemove('comboSolid'); msg('拿起套餐'); return;
         }
-        // Pick up or disassemble combo on packing station
         if (atPack) {
           if (G.carried && G.carried.userData.type === 'combo') { disassembleComboFromHand(); return; }
-          // Find combo on packing station surface
           if (!G.carried) {
             var children = G.scene.children;
             for (var ci4=0;ci4<children.length;ci4++) {
@@ -772,6 +807,26 @@ function startGame() {
                 if (d < 2.5) { G.carried = children[ci4]; collRemove('comboSolid'); msg('拿起套餐'); return; }
               }
             }
+          }
+        }
+      }
+      if (k === 'x' && !G.paused && (G.phase === 'waiting' || G.phase === 'playing' || G.phase === 'resting')) {
+        // NPC direct talk via crosshair
+        if (G.npcA && G.npcB) {
+          var ray3 = new THREE.Raycaster(); ray3.setFromCamera(new THREE.Vector2(0,0), G.camera);
+          if (ray3.intersectObjects(G.npcA.children, true).length>0 || ray3.intersectObjects(G.npcB.children, true).length>0) {
+            typewriteNPC('别凑过来，我们俩正在私下聊天呢，你可别偷听哦', null);
+            G.paused = true; chatting = true;
+            document.getElementById('dialogue-box').style.display = 'block';
+            document.getElementById('dialogue-speaker').textContent = '👤 顾客'; return;
+          }
+        }
+        var ray2 = new THREE.Raycaster(); ray2.setFromCamera(new THREE.Vector2(0,0), G.camera);
+        for (var xi=0; xi<G.customers.length; xi++) {
+          if (G.customers[xi].served && G.phase !== 'resting') continue;
+          if (G.customers[xi].group) {
+            var hits = ray2.intersectObjects(G.customers[xi].group.children, true);
+            if (hits.length > 0) { startDialogue(G.customers[xi]); return; }
           }
         }
       }
@@ -920,8 +975,13 @@ function animate() {
     if (G.restTimer <= 0) { endRestTime(); }
   }
 
+  // Eavesdrop hint (kitchen side near NPCs) - highest priority
+  if (G.npcA && G.npcB && G.camera.position.x>1&&G.camera.position.x<8 && G.camera.position.z>-6&&G.camera.position.z<-4) {
+    document.getElementById('talk-hint').style.display = 'block';
+    document.getElementById('talk-hint').textContent = '【按 Z 偷听】';
+  }
   // X key proximity hint (crosshair-based)
-  if (!G.paused && (G.phase === 'waiting' || G.phase === 'playing')) {
+  if (!G.paused && (G.phase === 'waiting' || G.phase === 'playing' || G.phase === 'resting')) {
     var hitsCrosshair = false;
     var ray2 = new THREE.Raycaster(); var ptr2 = new THREE.Vector2(0,0);
     ray2.setFromCamera(ptr2, G.camera);
@@ -1391,7 +1451,7 @@ function deliverCombo(combo) {
     }
     // Success!
     G.scene.remove(savedCombo);
-    savedNC.served = true; hidePaper();
+    savedNC.served = true; hidePaper(); G.activeCustomer = null;
     var w = createWaiter(); w.position.set(savedNC.x, 0, -6.5); G.scene.add(w); G.waiter = w;
     var price = calcPrice(savedNC.order); showResult(true, price);
     if (savedNC.exclam) { G.scene.remove(savedNC.exclam); savedNC.exclam = null; }
@@ -1457,6 +1517,28 @@ var custTexts = ['今天天气真好啊', '刚下班，饿死了', '听朋友说
   '今天心情好，犒劳自己', '快点快点饿死了', '少放点生菜哈', '要辣一点的！'];
 var custColors = [0xff6b6b, 0x6bc5ff, 0xffd93d, 0xa8e6cf, 0xdda0dd, 0xff9f43, 0x6dd5ed, 0xffcccc];
 
+function makeNPC(cx, cz, rotY, color) {
+  var g = new THREE.Group();
+  var body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.5, 8), new THREE.MeshStandardMaterial({ color: color, roughness: 0.7 }));
+  body.position.y = 0.75; g.add(body);
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), new THREE.MeshStandardMaterial({ color: 0xf5cba7, roughness: 0.7 }));
+  head.position.y = 1.1; g.add(head);
+  var lL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.25, 0.06), new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.7 })); lL.position.set(-0.08, 0.2, 0); g.add(lL);
+  var lR = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.25, 0.06), new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.7 })); lR.position.set(0.08, 0.2, 0); g.add(lR);
+  g.position.set(cx, 0, cz); g.rotation.y = rotY;
+  g.scale.set(1, 1.55 + Math.random() * 0.25, 1);
+  G.scene.add(g);
+  // Yellow question mark above NPC
+  var qCanvas = document.createElement('canvas'); qCanvas.width=128; qCanvas.height=128;
+  var qCtx = qCanvas.getContext('2d'); qCtx.fillStyle='#ffdd00'; qCtx.font='bold 100px Arial'; qCtx.textAlign='center'; qCtx.fillText('?',64,100);
+  var qTex = new THREE.CanvasTexture(qCanvas);
+  var qSprite = new THREE.Sprite(new THREE.SpriteMaterial({map:qTex,transparent:true,depthTest:false,depthWrite:false}));
+  qSprite.position.set(cx, 3.0, cz); qSprite.scale.set(1.0,1.0,1); G.scene.add(qSprite);
+  var zone = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.6), new THREE.MeshBasicMaterial({ visible: false }));
+  zone.position.y = 0.75; zone.userData = { isInteractable: true, isNPC: true }; g.add(zone); G.zones.push(zone);
+  return g;
+}
+
 function spawnCustomers() {
   G.customers.forEach(function(c) { if (c.group) { G.scene.remove(c.group); c.group = null; } });
   G.customers = [];
@@ -1514,6 +1596,11 @@ function spawnCustomers() {
     G.zones.push(zone);
     G.customers.push(cust);
     coll(cx-0.4, cx+0.4, cz-0.4, cz+0.4, 'cust'+ci);
+  }
+  // Day 3+ NPC pair behind back wall
+  if (G.day >= 3 && !G.npcA) {
+    G.npcA = makeNPC(4, -6.8, 0, 0x8888ff); // blue, face +Z
+    G.npcB = makeNPC(4, -7.8, Math.PI, 0xff8888); // red, face -Z
   }
   msg('走到前台跟顾客对话接单', 3000);
 }
