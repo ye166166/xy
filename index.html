@@ -50,7 +50,7 @@ canvas{display:block}
 <div id="hint">WASD 行走 · 左键操作 · 右键丢食材 · 空格锁定鼠标</div>
 <div id="total-earnings">💰 累计收入: 0元</div>
 <div id="order-paper"><div class="order-title">📋 今日订单</div><div class="order-content" id="order-content"></div><div class="order-hint">按 T 切换显示</div></div>
-<div id="result-screen"><div id="result-text"></div><div id="result-money"></div><div id="result-sub">按空格开始下一单</div></div>
+<div id="result-screen"><div id="result-text"></div><div id="result-money"></div></div>
 <div id="story-card"><div>这是我入职的第一天</div></div>
 <div id="day-hud">第一天，店内仅有一位客人</div>
 <div id="gameover-screen"><div id="gameover-text">Game Over</div><div id="gameover-sub">专心烹饪</div></div>
@@ -62,7 +62,7 @@ canvas{display:block}
 
 
 // === DIALOGUE SYSTEM ===
-var chatting = false, chatStep = 0, chatCust = null;
+var chatting = false, chatStep = 0, chatCust = null, skipType = null, chatCallback = null;
 var chatLines = ['今天天气真好，犒劳一下自己','刚下班饿死了，有什么推荐的？','听朋友说这家不错，推荐个招牌','第一次来，给推荐一个吧','今天想大吃一顿，你推荐啥？','随便做点啥都行，推荐就行','肚子好饿～推荐推荐','好久没吃了，推荐个好吃的','快点快点，你推荐啥我吃啥','要辣一点的，给我推荐个经典的','来份汉堡垫垫肚子','吃啥都行，看着安排吧','想尝尝你们这里的招牌菜','今天心情好，推荐个好的','有什么拿手好菜？推荐一下'];
 var chatReplies = {
   '推荐招牌汉堡': ['好嘞！来份招牌的！','就这个吧，经典口味不会错'],
@@ -96,14 +96,16 @@ function startDialogue(cust) {
   document.getElementById('dialogue-choices').style.display = 'none';
 
   if (chatCust.served) {
-    typewrite('有什么事吗？', function() { showChatChoices(); });
+    if (G.phase === 'resting') typewrite('有什么事吗？', function() { showChatChoices(); });
+    else typewrite(chatBrief[Math.floor(Math.random()*chatBrief.length)], null);
   } else if (G.activeCustomer && chatCust === G.activeCustomer) {
     typewrite('你的订单还要多久啊？', function() { showBusyChoices(); });
   } else if (!chatCust.dialogued && chatCust.isOrdering) {
     var txt = chatLines[Math.floor(Math.random() * chatLines.length)];
-    typewrite(txt, function() { setTimeout(function() { showChoices(); }, 500); });
+    typewrite(txt, function() { showChoices(); });
   } else if (!chatCust.dialogued) {
-    typewrite('有什么事吗？', function() { showChatChoices(); });
+    if (G.phase === 'resting') typewrite('有什么事吗？', function() { showChatChoices(); });
+    else typewrite(chatBrief[Math.floor(Math.random()*chatBrief.length)], null);
   } else {
     typewrite('你有什么事吗？', function() { showBusyChoices(); });
   }
@@ -131,25 +133,24 @@ function selectBusy(op) {
   document.getElementById('dialogue-choices').style.display = 'none';
   document.removeEventListener('keydown', onBusyKey);
   if (op === '再见') { closeDialogue(); return; }
-  typewrite(op === '马上就好' ? '好的，稍等一下哦～' : '好的，那你先忙吧～', function() {
-    setTimeout(function() { closeDialogue(); }, 800);
-  });
+  typewrite(op === '马上就好' ? '好的，稍等一下哦～' : '好的，那你先忙吧～', null);
 }
 
 function typewrite(text, callback) {
   var el = document.getElementById('dialogue-text');
   el.innerHTML = '';
+  chatCallback = null;
   var i = 0;
   function step() {
-    if (i < text.length) {
-      el.innerHTML = text.substring(0, i+1) + '<span class="cursor">|</span>';
-      i++;
-      setTimeout(step, 40);
-    } else {
-      el.innerHTML = text;
-      if (callback) setTimeout(callback, 300);
-    }
+    if (skipType) { el.innerHTML = text; skipType = null; done(); return; }
+    if (i < text.length) { el.innerHTML = text.substring(0, i+1) + '<span class="cursor">|</span>'; i++; skipType = step; setTimeout(step, 40); }
+    else { el.innerHTML = text; skipType = null; done(); }
   }
+  function done() {
+    if (callback) { el.innerHTML += '<br><small style="color:#888">按 R 继续</small>'; chatCallback = callback; }
+    else { el.innerHTML += '<br><small style="color:#888">按 R 结束聊天</small>'; chatCallback = function(){closeDialogue();}; }
+  }
+  skipType = step;
   step();
 }
 
@@ -181,13 +182,12 @@ function selectChoice(choice) {
   document.removeEventListener('keydown', onDialogueKey);
   var replies = chatReplies[choice] || ['好的！'];
   var reply = replies[Math.floor(Math.random() * replies.length)];
-  typewrite(reply, function() {
-    setTimeout(function() { closeDialogue(); }, 800);
-  });
+  typewrite(reply, null);
 }
 
 var chatJokes = ['小白加小白等于什么？等于小白兔（小白two），好笑吧哈哈。','有一天火柴头浑身发痒，挠着挠着，自己把自己点着了。','海水为什么是蓝色的？因为小鱼一直在吐泡泡，布鲁布鲁（blue blue）。','从前有个人钓鱼，钓上来一只鱿鱼，鱿鱼苦苦哀求别烤了它，那人说行，考你几个问题就行，鱿鱼当场崩溃：别考别考！','你晓得布和纸最怕什么吗？不怕一万只怕万一，不（布）怕一万，只（纸）怕万一哟。','为什么大雁冬天要往南边飞？因为走过去太慢啦，当然要飞着走才行。','一颗玉米走在路上觉得太热，走着走着它就变成爆米花了。'];
 var chatLores = ['我听说这家店收留过不少弄丢过往的人，在这里安安稳稳过日子，比在外颠沛流离舒服太多了。','看你处理食材的动作干脆利落，下手精准又沉稳，寻常打工的店员可练不出这种本事。','这家老店看着平平无奇，背地里藏着不少没人知晓的秘密，尤其是店铺往后的位置，可不简单。','偶尔深夜路过店铺后面，总能隐约听见细碎动静，总觉得那片墙后面藏着东西。'];
+var chatBrief = ['我在等人呢。','这会儿忙，待会再说。','先看看菜单再说。','这里环境不错啊。','闻着好香～','今天人挺多的嘛。','坐会儿休息下。'];
 
 function showChatChoices() {
   var container = document.getElementById('dialogue-choices');
@@ -212,9 +212,9 @@ function selectChat(op) {
   document.removeEventListener('keydown', onChatKey);
   if (op.indexOf('没事')>=0) { closeDialogue(); return; }
   var r = Math.random();
-  if (r < 0.5) { typewrite('不了，我还有事。', function(){setTimeout(function(){closeDialogue();},600);}); }
-  else if (r < 0.8) { var joke = chatJokes[Math.floor(Math.random()*chatJokes.length)]; typewrite(joke, function(){setTimeout(function(){closeDialogue();},1200);}); }
-  else { var lore = chatLores[Math.floor(Math.random()*chatLores.length)]; typewrite(lore, function(){setTimeout(function(){closeDialogue();},1500);}); }
+  if (r < 0.5) { typewrite('不了，我还有事。', null); }
+  else if (r < 0.8) { typewrite(chatJokes[Math.floor(Math.random()*chatJokes.length)], null); }
+  else { typewrite(chatLores[Math.floor(Math.random()*chatLores.length)], null); }
 }
 
 function endRestTime() {
@@ -242,6 +242,8 @@ function closeDialogue() {
   document.getElementById('dialogue-box').style.display = 'none';
   G.paused = false;
   chatting = false;
+  chatCallback = null;
+  skipType = null;
   if (chatCust && !chatCust.dialogued && chatCust.isOrdering) {
     chatCust.dialogued = true;
     G.activeCustomer = chatCust;
@@ -719,6 +721,11 @@ function startGame() {
 
       if (k === ' ' && G.locked && G.restActive) { endRestTime(); return; }
       if (k === ' ' && G.locked && G.phase === 'playing') G.renderer.domElement.requestPointerLock();
+      if (k === 'r' && G.paused && chatting) {
+        if (skipType) { skipType(); return; }
+        if (chatCallback) { var cb = chatCallback; chatCallback = null; cb(); return; }
+        return;
+      }
       if (k === 'r' && (G.phase === 'playing' || G.phase === 'waiting' || G.phase === 'resting')) {
         // Customer dialogue - check nearest arrived customer
         if (G.customers.length > 0) {
@@ -1384,16 +1391,13 @@ function deliverCombo(combo) {
     }
     // Success!
     G.scene.remove(savedCombo);
-    savedNC.served = true; hidePaper(); G.phase = 'delivering';
+    savedNC.served = true; hidePaper();
     var w = createWaiter(); w.position.set(savedNC.x, 0, -6.5); G.scene.add(w); G.waiter = w;
-    var price = calcPrice(savedNC.order); showResult(true, price); G.phase = 'success';
-    // Remove exclamation
+    var price = calcPrice(savedNC.order); showResult(true, price);
     if (savedNC.exclam) { G.scene.remove(savedNC.exclam); savedNC.exclam = null; }
-    // Don't remove customer - they stay to chat
     setTimeout(function() { G.scene.remove(w); G.waiter = null; }, 1500);
     setTimeout(function() {
       hideResult();
-      // Check if all ordering customers are served
       var allServed = true;
       for (var si=0; si<G.customers.length; si++) {
         if (G.customers[si].isOrdering && !G.customers[si].served) { allServed = false; break; }
