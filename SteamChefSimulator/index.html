@@ -471,136 +471,195 @@ function dropIt() {
 }
 
 // ===== SAVE SYSTEM =====
-var SAVE_PREFIX = 'steamChefA_'; // renamed to avoid collision with old saves
-
 // Show main menu at startup
 document.getElementById('main-menu').style.display = 'flex';
 G.init = false;
 
+function cloneSlots(arr) {
+  var out = []; for (var i=0;i<arr.length;i++) { var s=arr[i]; out.push({p:s.p?[s.p[0],s.p[1],s.p[2]]:null,o:s.o||0,t:s.t||0,ti:s.ti||0,s:s.s||'e',r:s.r||0}); } return out;
+}
+function serializeItem(m) {
+  if (!m) return null;
+  var d={type:m.userData.type};
+  if(m.userData.state)d.state=m.userData.state;
+  if(m.userData.recipe)d.recipe=m.userData.recipe.slice();
+  if(m.userData.isTop)d.isTop=m.userData.isTop;
+  if(m.userData.items){d.items=[];for(var i=0;i<m.userData.items.length;i++)d.items.push(serializeItem(m.userData.items[i]));}
+  return d;
+}
+function traySlotData(s) { return s?serializeItem(s):null; }
+function customerData(c) { return {x:c.x,z:c.group?c.group.position.z:c.z,order:{burger:c.order.burger?c.order.burger.slice():null,fries:c.order.fries,drinks:c.order.drinks.slice()},served:c.served,dialogued:c.dialogued,arrived:c.arrived,isOrdering:c.isOrdering,destX:c.destX,destZ:c.destZ}; }
+
 function getSaveData() {
-  return { day: G.day, phase: G.phase, money: G.money, eavesdropped: G.eavesdropped };
+  var d={
+    day:G.day,phase:G.phase,money:G.money,eavesdropped:G.eavesdropped,
+    px:G.camera.position.x,py:G.camera.position.y,pz:G.camera.position.z,yaw:G.yaw,pitch:G.pitch,
+    carried:serializeItem(G.carried),
+    dOpen:G.dOpen,rdOpen:G.rdOpen||false,
+    restActive:G.restActive,restInfinite:G.restInfinite,restTimer:G.restTimer,
+    gSlots:cloneSlots(G.gSlots),fSlots:cloneSlots(G.fSlots),
+    ass:{bBot:G.ass.bBot,stk:G.ass.stk,eg:G.ass.eg,lt:G.ass.lt,bTop:G.ass.bTop,sc:G.ass.sc.slice()},
+    trayPlaced:G.tray.placed,traySlots:G.tray.slots.map(traySlotData),
+    customers:[],
+    activeCustomerIdx:-1,
+    loose:[], comboOnDesk:G.comboOnDesk?serializeItem(G.comboOnDesk):null,
+    currentSaveKey:G.currentSaveKey
+  };
+  for(var i=0;i<G.customers.length;i++)d.customers.push(customerData(G.customers[i]));
+  if(G.activeCustomer){for(var i=0;i<G.customers.length;i++)if(G.customers[i]===G.activeCustomer)d.activeCustomerIdx=i;}
+  for(var i=0;i<G.loose.length;i++){var m=G.loose[i];if(m&&m.userData)d.loose.push({x:m.position.x,y:m.position.y,z:m.position.z,item:serializeItem(m)});}
+  return d;
 }
 
 function saveToSlot(key) {
-  localStorage.setItem(key, JSON.stringify(getSaveData()));
+  try { localStorage.setItem(key, JSON.stringify(getSaveData())); } catch(e) { showConfirm('存档空间不足，请清理旧存档。', function(){},true); }
 }
 
 function getAllSaves() {
-  var result = [];
-  var prefix = 'steamChef_';
-  for (var i = 0; i < localStorage.length; i++) {
-    var k = localStorage.key(i);
-    if (k && k.indexOf(prefix) === 0) {
-      try {
-        var d = JSON.parse(localStorage.getItem(k));
-        result.push({ key: k, day: d.day || 1, money: d.money || 0, phase: d.phase || 'intro', eavesdropped: d.eavesdropped || false });
-      } catch(e) {}
-    }
-  }
-  result.sort(function(a, b) { return a.key < b.key ? -1 : a.key > b.key ? 1 : 0; });
-  return result;
+  var result=[],prefix='steamChef_';
+  for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf(prefix)===0){try{var d=JSON.parse(localStorage.getItem(k));result.push({key:k,day:d.day||1,money:d.money||0,phase:d.phase||'intro',eavesdropped:d.eavesdropped||false});}catch(e){}}}
+  result.sort(function(a,b){return a.key<b.key?-1:a.key>b.key?1:0;}); return result;
 }
 
 function getLatestSeries() {
-  var saves = getAllSaves();
-  var maxCode = 0;
-  for (var i = 0; i < saves.length; i++) {
-    var s = saves[i].key;
-    // extract series letter: steamChef_A1 -> A, steamChef_AB2 -> AB
-    var m = s.match(/steamChef_([A-Z]+)\d+$/);
-    if (m) {
-      var letters = m[1];
-      var code = 0;
-      for (var j = 0; j < letters.length; j++) code = code * 26 + (letters.charCodeAt(j) - 64);
-      if (code > maxCode) maxCode = code;
-    }
-  }
+  var saves=getAllSaves(),maxCode=0;
+  for(var i=0;i<saves.length;i++){var m=saves[i].key.match(/steamChef_([A-Z]+)\d+$/);if(m){var letters=m[1],code=0;for(var j=0;j<letters.length;j++)code=code*26+(letters.charCodeAt(j)-64);if(code>maxCode)maxCode=code;}}
   return maxCode;
 }
+function codeToSeries(code){var s='';while(code>0){var r=(code-1)%26;s=String.fromCharCode(65+r)+s;code=Math.floor((code-1)/26);}return s||'A';}
+function nextSeriesKey(){return'steamChef_'+codeToSeries(getLatestSeries()+1)+'1';}
+function getCurrentSeriesVersion(key){var m=key.match(/steamChef_([A-Z]+)(\d+)$/);return m?{series:m[1],version:parseInt(m[2])}:null;}
+function nextSaveInSeries(key){var m=getCurrentSeriesVersion(key);if(!m)return'steamChef_A1';return'steamChef_'+m.series+(m.version+1);}
 
-function codeToSeries(code) {
-  var s = '';
-  while (code > 0) {
-    var r = (code - 1) % 26;
-    s = String.fromCharCode(65 + r) + s;
-    code = Math.floor((code - 1) / 26);
+function saveGame(){
+  var key=G.currentSaveKey;if(!key){showConfirm('无法保存：未关联存档系列',function(){},true);return;}
+  var newKey=nextSaveInSeries(key);
+  var enc=new TextEncoder().encode(JSON.stringify(getSaveData()));
+  if(enc.length*2>4500000){showConfirm('存储空间不足，请删除部分存档后再保存。',function(){},true);return;}
+  try{
+    localStorage.setItem(newKey,JSON.stringify(getSaveData()));
+    G.currentSaveKey=newKey;
+    showConfirm('存档 '+newKey.replace('steamChef_','')+' 保存成功！',function(){},true);
+  }catch(e){
+    showConfirm('存储空间不足，请删除部分旧存档后重试。',function(){},true);
   }
-  return s || 'A';
 }
 
-function nextSeriesKey() {
-  var code = getLatestSeries() + 1;
-  return 'steamChef_' + codeToSeries(code) + '1';
+// ---- ITEM CREATION HELPERS (using game's actual creation functions) ----
+function mkItem(type,state){
+  state=state||'raw';var m;
+  switch(type){
+    case'steak':m=cSteak(state==='cooked');break;
+    case'egg':m=cEgg(state==='raw');break;
+    case'fries':m=cFries(state==='cooked');break;
+    case'lettuce':m=cLett();break;
+    case'bun_bot':m=new THREE.Mesh(new THREE.SphereGeometry(0.15,16,12,0,Math.PI*2,0,Math.PI/2),new THREE.MeshStandardMaterial({color:0xd4a047,roughness:0.7}));m.scale.y=0.55;m.castShadow=true;m.userData={type:'bun',state:'cooked',canPickup:1,isTop:false};break;
+    case'bun_top':m=new THREE.Mesh(new THREE.SphereGeometry(0.15,16,12,0,Math.PI*2,0,Math.PI/2),new THREE.MeshStandardMaterial({color:0xd4a047,roughness:0.7}));m.scale.y=0.85;m.castShadow=true;m.userData={type:'bun',state:'cooked',canPickup:1,isTop:true};break;
+    case'ketchup':m=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.14,0.07),new THREE.MeshStandardMaterial({color:0xcc1111,roughness:0.3}));m.userData={type:'ketchup',canPickup:1};break;
+    case'mustard':m=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.14,0.07),new THREE.MeshStandardMaterial({color:0xccaa00,roughness:0.3}));m.userData={type:'mustard',canPickup:1};break;
+    case'cola':m=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.16,10),new THREE.MeshStandardMaterial({color:0xdd2222,roughness:0.3}));m.castShadow=true;m.userData={type:'cola',state:'cooked',canPickup:1};break;
+    case'sprite':m=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,0.16,10),new THREE.MeshStandardMaterial({color:0x44ee44,roughness:0.3}));m.castShadow=true;m.userData={type:'sprite',state:'cooked',canPickup:1};break;
+    case'tray':m=createTrayObject();break;
+    default:return null;
+  }
+  if(m){m.userData.canPickup=1;G.scene.add(m);}
+  return m;
 }
 
-function getCurrentSeriesVersion(key) {
-  var m = key.match(/steamChef_([A-Z]+)(\d+)$/);
-  return m ? { series: m[1], version: parseInt(m[2]) } : null;
+function createTrayObject(){
+  var g=new THREE.Group();
+  var base=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.04,0.7),new THREE.MeshStandardMaterial({color:0xcccccc,roughness:0.5}));base.position.y=0.06;g.add(base);
+  var rims=[-0.4,0.4];for(var i=0;i<rims.length;i++){var r=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.03,0.04),new THREE.MeshStandardMaterial({color:0xbbbbbb,roughness:0.5}));r.position.set(0,0.08,rims[i]);g.add(r);}
+  g.userData={type:'tray',canPickup:1};return g;
 }
 
-function nextSaveInSeries(key) {
-  var m = getCurrentSeriesVersion(key);
-  if (!m) return 'steamChef_A1';
-  return 'steamChef_' + m.series + (m.version + 1);
+function restoreGState(data){
+  G.day=data.day||1;G.money=data.money||0;G.eavesdropped=data.eavesdropped||false;
+  G.camera.position.set(data.px||0,data.py||1.7,data.pz||4.5);G.yaw=data.yaw||0;G.pitch=data.pitch||0;
+  G.dOpen=data.dOpen||false;G.rdOpen=data.rdOpen||false;
+  G.restActive=data.restActive||false;G.restInfinite=data.restInfinite||false;G.restTimer=data.restTimer||0;
+  var a=data.ass||{bBot:0,stk:0,eg:0,lt:0,bTop:0,sc:[]};G.ass.bBot=a.bBot||0;G.ass.stk=a.stk||0;G.ass.eg=a.eg||0;G.ass.lt=a.lt||0;G.ass.bTop=a.bTop||0;G.ass.sc=(a.sc||[]).slice();
+
+  if(data.gSlots){G.gSlots.forEach(function(s,i){if(data.gSlots[i]){s.o=data.gSlots[i].o;s.t=data.gSlots[i].t;s.ti=data.gSlots[i].ti;s.s=data.gSlots[i].s;s.r=data.gSlots[i].r;if(s.s==='cooking'||s.s==='ready'){if(s.m){G.scene.remove(s.m);}var it=mkItem(s.t==='steak'?'steak':'egg',s.r?'cooked':'raw');it.position.set(G.gGrill.position.x+s.p[0],0.57,G.gGrill.position.z+s.p[2]);G.scene.add(it);s.m=it;}}});}
+  if(data.fSlots){G.fSlots.forEach(function(s,i){if(data.fSlots[i]){s.ti=data.fSlots[i].ti;s.s=data.fSlots[i].s;s.r=data.fSlots[i].r;if(s.s==='cooking'||s.s==='ready'){if(s.m){G.scene.remove(s.m);}var f=mkItem('fries',s.r?'cooked':'raw');f.position.set(G.fFryer.position.x+s.p[0],0.55,G.fFryer.position.z+s.p[2]);G.scene.add(f);s.m=f;}}});}
+
+  if(data.carried){var cm=mkItem(data.carried.type,data.carried.state);if(cm){cm.userData.canPickup=0;G.carried=cm;if(data.carried.recipe)G.carried.userData.recipe=data.carried.recipe.slice();if(data.carried.isTop!==undefined)G.carried.userData.isTop=data.carried.isTop;}}
+
+  G.tray={placed:false,mesh:null,slots:[null,null,null,null,null,null]};
+  if(data.trayPlaced&&G.pTray){var tm=createTrayObject();tm.position.set(G.pTray.position.x,0.53,G.pTray.position.z);G.scene.add(tm);G.tray.mesh=tm;G.tray.placed=true;
+    for(var ti=0;ti<6;ti++){if(data.traySlots[ti]){var si=mkItem(data.traySlots[ti].type,data.traySlots[ti].state);if(si){si.position.set(G.pTray.position.x+slotPos[ti][0],G.pTray.position.y+slotPos[ti][1],G.pTray.position.z+slotPos[ti][2]);si.scale.set(0.4,0.4,0.4);G.scene.add(si);G.tray.slots[ti]=si;}}}
+  }
+
+  if(data.comboOnDesk){var com=mkItem(data.comboOnDesk.type,data.comboOnDesk.state);if(com){com.position.set(5.5,0.55,-0.5);com.scale.set(2,2,2);G.scene.add(com);G.comboOnDesk=com;coll(4.8,6.2,-1.0,0,'comboSolid');}}
+
+  if(data.loose){for(var li=0;li<data.loose.length;li++){var lm=mkItem(data.loose[li].item.type,data.loose[li].item.state);if(lm){lm.position.set(data.loose[li].x,data.loose[li].y||0.1,data.loose[li].z);G.scene.add(lm);G.loose.push(lm);}}}
+
+  document.getElementById('total-earnings').textContent='💰 累计收入: '+G.money+'元';
 }
 
-function saveGame() {
-  var key = G.currentSaveKey;
-  if (!key) { showConfirm('无法保存：未关联存档系列', function(){}, true); return; }
-  var newKey = nextSaveInSeries(key);
-  G.currentSaveKey = newKey;
-  saveToSlot(newKey);
-  showConfirm('存档 ' + newKey.replace('steamChef_','') + ' 保存成功！', function(){}, true);
-}
-
-function loadGameFromKey(key) {
-  try {
-    var raw = localStorage.getItem(key);
-    if (!raw) { showConfirm('存档不存在', function(){}, true); return; }
-    var data = JSON.parse(raw);
-    // Clean current scene
-    G.paused = false;
-    if (document.pointerLockElement) document.exitPointerLock();
-    if (G.renderer) {
-      if (G.renderer.domElement && G.renderer.domElement.parentNode) G.renderer.domElement.parentNode.removeChild(G.renderer.domElement);
-      G.renderer.dispose();
+function applyCustomersFromData(data){
+  if(!data.customers||data.customers.length===0)return;
+  for(var ci=0;ci<G.customers.length;ci++){
+    if(G.customers[ci].group&&G.customers[ci].group.parent)G.scene.remove(G.customers[ci].group);
+  }
+  G.customers=[];
+  var hScale=1.55;
+  for(var ci=0;ci<data.customers.length;ci++){
+    var cd=data.customers[ci];
+    var g=new THREE.Group();G.scene.add(g);
+    g.position.set(cd.x,0,cd.z);g.scale.set(1,hScale,1);
+    var hc=custColors[ci%custColors.length];
+    var body=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.25,0.5,8),new THREE.MeshStandardMaterial({color:hc,roughness:0.7}));body.position.y=0.75;g.add(body);
+    var head=new THREE.Mesh(new THREE.SphereGeometry(0.12,8,6),new THREE.MeshStandardMaterial({color:0xf5cba7,roughness:0.7}));head.position.y=1.1;g.add(head);
+    var ll=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.25,0.06),new THREE.MeshStandardMaterial({color:0x444444,roughness:0.7}));ll.position.set(-0.08,0.2,0);g.add(ll);
+    var lr=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.25,0.06),new THREE.MeshStandardMaterial({color:0x444444,roughness:0.7}));lr.position.set(0.08,0.2,0);g.add(lr);
+    var cust={group:g,order:cd.order,served:cd.served,dialogued:cd.dialogued,x:cd.x,z:cd.z,arrived:cd.arrived,exclam:null,isOrdering:cd.isOrdering,destX:cd.destX,destZ:cd.destZ};
+    // Add exclamation mark for ordering unsaved customers
+    if(!cust.served&&cust.isOrdering){
+      var excCanvas=document.createElement('canvas');excCanvas.width=128;excCanvas.height=128;
+      var excCtx=excCanvas.getContext('2d');excCtx.fillStyle='#ff0000';excCtx.font='bold 100px Arial';excCtx.textAlign='center';excCtx.fillText('!',64,100);
+      var excTex=new THREE.CanvasTexture(excCanvas);
+      var excSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:excTex,transparent:true,depthTest:false,depthWrite:false}));
+      excSprite.position.set(0,3.5,0);g.add(excSprite);cust.exclam=excSprite;
     }
-    G.scene = null; G.camera = null; G.renderer = null; G.clock = null;
-    G.boxes = []; G.customers = []; G.zones = [];
-    G.oldMan = null; G.npcA = null; G.npcB = null;
-    G.carried = null; G.tray = {placed:false,mesh:null,slots:[null,null,null,null,null,null]}; G.comboOnDesk = null;
-    G.ass = {bBot:0,stk:0,eg:0,lt:0,bTop:0,sc:[],vis:null};
-    G.loose = []; G.drops = [];
-    G.activeCustomer = null; G.restActive = false; G.restInfinite = false;
-    G.evesLines = []; G.evesIdx = 0;
-    G.settingsOpen = false;
-    G.day = data.day || 1;
-    G.phase = 'ordering';
-    G.money = data.money || 0;
-    G.eavesdropped = data.eavesdropped || false;
-    G.currentSaveKey = key;
-    document.getElementById('total-earnings').textContent = '💰 累计收入: ' + G.money + '元';
-    document.getElementById('main-menu').style.display = 'none';
-    document.getElementById('settings-menu').style.display = 'none';
-    document.getElementById('save-list').style.display = 'none';
-    G.init = false;
-    startGame();
-    setTimeout(function() {
-      if (G.phase !== 'ordering') return;
-      G.renderer.domElement.requestPointerLock();
-      document.getElementById('story-card').innerHTML = '<div style="font-size:50px">第' + G.day + '天</div>';
-      document.getElementById('story-card').style.display = 'flex';
-      setTimeout(function() {
-        document.getElementById('story-card').style.display = 'none';
-        document.getElementById('day-hud').style.display = 'block';
-        G.phase = 'waiting';
-        spawnCustomers();
-        msg('→ 走到前台跟顾客对话接单', 3000);
-      }, 3000);
-    }, 200);
-  } catch(e) {
-    showConfirm('存档损坏，无法读取。', function(){}, true);
+    G.customers.push(cust);
   }
+  if(data.activeCustomerIdx>=0&&data.activeCustomerIdx<G.customers.length)G.activeCustomer=G.customers[data.activeCustomerIdx];
+}
+
+function loadGameFromKey(key){
+  try{
+    var raw=localStorage.getItem(key);if(!raw){showConfirm('存档不存在',function(){},true);return;}
+    var data=JSON.parse(raw);
+    G.paused=false;if(document.pointerLockElement)document.exitPointerLock();
+    if(G.renderer){if(G.renderer.domElement&&G.renderer.domElement.parentNode)G.renderer.domElement.parentNode.removeChild(G.renderer.domElement);G.renderer.dispose();}
+    G.scene=null;G.camera=null;G.renderer=null;G.clock=null;G.boxes=[];G.customers=[];G.zones=[];
+    G.oldMan=null;G.npcA=null;G.npcB=null;G.carried=null;G.comboOnDesk=null;G.loose=[];G.drops=[];
+    G.activeCustomer=null;G.evesLines=[];G.evesIdx=0;G.settingsOpen=false;
+    G.currentSaveKey=key;
+    // Prevent pointerlockchange from spawning fresh customers
+    G.day=data.day||1;G.phase='loading';
+    document.getElementById('main-menu').style.display='none';document.getElementById('settings-menu').style.display='none';document.getElementById('save-list').style.display='none';
+    G.init=false;startGame();
+    setTimeout(function(){
+      restoreGState(data);
+      applyCustomersFromData(data);
+      if(G.dOpen){collRemove('divDoorSolid');coll(-10.15,-10.05,-0.7,1.1,'divDoorSolid');G.divPiv.rotation.y=Math.PI/2;}
+      if(data.rdOpen){if(G.rdPiv){G.rdPiv.rotation.y=-Math.PI/2;collRemove('rdSolid');}}
+      G.renderer.domElement.requestPointerLock();
+      document.getElementById('story-card').innerHTML='<div style="font-size:50px">第'+G.day+'天</div>';
+      document.getElementById('story-card').style.display='flex';
+      setTimeout(function(){document.getElementById('story-card').style.display='none';document.getElementById('day-hud').style.display='block';
+        if(G.restActive){
+          if(G.restInfinite){document.getElementById('day-hud').textContent='休息时间';}else{document.getElementById('day-hud').textContent='休息时间: '+Math.floor(G.restTimer/60)+':'+(Math.floor(G.restTimer%60)<10?'0':'')+Math.floor(G.restTimer%60);}
+          G.phase='resting';
+        }else{
+          G.phase='waiting';
+          if(!G.restActive&&(!data.customers||data.customers.length===0)){spawnCustomers();}
+        }
+      },2000);
+    },200);
+  }catch(e){showConfirm('存档损坏，无法读取。',function(){},true);}
 }
 
 function showSaveList(callback) {
@@ -638,12 +697,15 @@ function deleteSaveSeries(key) {
   var series = m.series;
   var ver = m.version;
   var allSaves = getAllSaves();
+  var deleted = 0;
   for (var i = 0; i < allSaves.length; i++) {
     var sm = getCurrentSeriesVersion(allSaves[i].key);
     if (sm && sm.series === series && sm.version >= ver) {
       localStorage.removeItem(allSaves[i].key);
+      deleted++;
     }
   }
+  showConfirm('已删除 '+series+'系列 '+deleted+' 条存档，存储空间已释放。', function(){}, true);
 }
 
 function hasSubsequentSaves(key) {
@@ -863,11 +925,11 @@ function startGame() {
     addWall(0.2, 12.2, -8.1, 0);
     addWall(0.2, 12.2, 8.1, 0);
     // Right passage door (hinge at x=8.2, z=-6.1)
-    var rdOpen = false, rdPiv = new THREE.Group(); rdPiv.position.set(8.2, 2, -6.1);
+    G.rdOpen = false; G.rdPiv = new THREE.Group(); G.rdPiv.position.set(8.2, 2, -6.1);
     var rdMesh = new THREE.Mesh(new THREE.BoxGeometry(1.5, 4, 0.2), WM);
-    rdMesh.position.set(0.75, 0, 0); rdPiv.add(rdMesh);
+    rdMesh.position.set(0.75, 0, 0); G.rdPiv.add(rdMesh);
     coll(8.2, 9.7, -6.2, -6.0, 'rdSolid');
-    S.add(rdPiv);
+    S.add(G.rdPiv);
     // Wall from door end to outer wall
     addWall(2.5, 0.2, 10.85, -6.1);
     coll(9.5, 12.2, -6.2, -6.0);
@@ -1271,10 +1333,10 @@ function startGame() {
         if (G.camera.position.distanceTo(new THREE.Vector3(-10.08, 0, 1.1)) < 2.3) toggleDivDoor();
         // Right passage door
         if (G.camera.position.distanceTo(new THREE.Vector3(8.2, 0, -6.1)) < 2.5) {
-          if (!rdOpen) { rdOpen = true; collRemove('rdSolid');
-            var rdSt = performance.now(); !function r1(){ var rt = Math.min((performance.now()-rdSt)/500, 1); rdPiv.rotation.y = -Math.PI/2*rt; if (rt<1) requestAnimationFrame(r1); }();
-          } else { rdOpen = false;
-            var rdSt2 = performance.now(); !function r2(){ var rt2 = Math.min((performance.now()-rdSt2)/500, 1); rdPiv.rotation.y = -Math.PI/2*(1-rt2); if (rt2<1) requestAnimationFrame(r2); else coll(8.2,9.7,-6.2,-6.0,'rdSolid'); }();
+          if (!G.rdOpen) { G.rdOpen = true; collRemove('rdSolid');
+            var rdSt = performance.now(); !function r1(){ var rt = Math.min((performance.now()-rdSt)/500, 1); G.rdPiv.rotation.y = -Math.PI/2*rt; if (rt<1) requestAnimationFrame(r1); }();
+          } else { G.rdOpen = false;
+            var rdSt2 = performance.now(); !function r2(){ var rt2 = Math.min((performance.now()-rdSt2)/500, 1); G.rdPiv.rotation.y = -Math.PI/2*(1-rt2); if (rt2<1) requestAnimationFrame(r2); else coll(8.2,9.7,-6.2,-6.0,'rdSolid'); }();
           }
         }
       }
@@ -1328,13 +1390,14 @@ function startGame() {
     });
     document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
-    G.renderer.domElement.addEventListener('click', function() { G.renderer.domElement.requestPointerLock(); });
     window.addEventListener('resize', function() {
-      G.camera.aspect = window.innerWidth / window.innerHeight;
-      G.camera.updateProjectionMatrix();
-      G.renderer.setSize(window.innerWidth, window.innerHeight);
+      if(G.camera){G.camera.aspect = window.innerWidth / window.innerHeight;G.camera.updateProjectionMatrix();}
+      if(G.renderer)G.renderer.setSize(window.innerWidth, window.innerHeight);
     });
     } // end handlersInit guard
+
+    // Canvas click-to-lock (re-registered per new canvas)
+    if(G.renderer&&G.renderer.domElement) G.renderer.domElement.addEventListener('click', function() { G.renderer.domElement.requestPointerLock(); });
 
     // Start animation
     animate();
@@ -1350,6 +1413,7 @@ function startGame() {
 
 // Animation loop
 function animate() {
+  if (!G.clock) return;
   requestAnimationFrame(animate);
   var dt = Math.min(G.clock.getDelta(), 0.05);
 
