@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Steam Chef Simulator</title>
 <style>
 *{margin:0;padding:0;overflow:hidden}
@@ -70,6 +73,10 @@ canvas{display:block}
 #save-list .sllist button:hover{background:rgba(255,215,0,0.15);border-color:#ffd700}
 #save-list .slclose{margin-top:18px;width:160px;padding:10px 0;font-size:16px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.06);color:#fff;border-radius:10px;cursor:pointer}
 #save-list .slclose:hover{background:rgba(255,215,0,0.12);border-color:#ffd700}
+#blink-top{position:fixed;top:-50%;left:0;right:0;height:50%;background:#000;z-index:60;transition:top 0.18s ease-in}
+#blink-bot{position:fixed;bottom:-50%;left:0;right:0;height:50%;background:#000;z-index:60;transition:bottom 0.18s ease-in}
+#monologue-text{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:38px;z-index:55;pointer-events:none;display:none;text-shadow:2px 2px 6px rgba(0,0,0,0.8)}
+#space-hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);color:#ffd700;font-size:18px;z-index:5;pointer-events:none;display:none;text-shadow:1px 1px 3px rgba(0,0,0,0.8)}
 </style>
 </head>
 <body>
@@ -86,6 +93,10 @@ canvas{display:block}
 <div id="day-hud"></div>
 <div id="time-label"></div>
 <div id="gameover-screen"><div id="gameover-text">Game Over</div><div id="gameover-sub">专心烹饪</div></div>
+<div id="blink-top"></div>
+<div id="blink-bot"></div>
+<div id="monologue-text"></div>
+<div id="space-hint">按下空格键结束今天</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js">
 </script>
@@ -372,6 +383,7 @@ function showOldClose() {
         m.style.fontSize='30px';
       }, 1500);
     }, 400);
+    G.oldManTalked = true;
     closeDialogue();
   });
 }
@@ -393,6 +405,19 @@ function endRestTime() {
     G.fSlots.forEach(function(s){if(s.m){G.scene.remove(s.m);s.m=0;s.o=0;s.s='e';s.ti=0;s.r=0;}});
     spawnCustomers();
     G.activeCustomer = null;
+    // Day 3+ NPC pair and old man
+    if (G.day >= 3 && !G.npcA) {
+      G.npcA = makeNPC(4, -6.8, 0, 0x8888ff);
+      G.npcB = makeNPC(4, -7.8, Math.PI, 0xff8888);
+    }
+    if (G.day >= 3 && !G.oldMan) {
+      G.oldMan = createOldMan();
+      G.oldMan.position.set(-10.0, 0, 2.8);
+      G.oldMan.rotation.y = Math.PI;
+      G.oldMan.scale.set(1.5, 1.5, 1.5);
+      G.scene.add(G.oldMan);
+      coll(-10.3, -9.7, 2.5, 3.1, 'oldManCol');
+    }
   }, 2500);
 }
 
@@ -439,10 +464,15 @@ var G = {
   restActive: false,
   restInfinite: false,
   eavesdropped: false,
+  oldManTalked: false,
   evesLines: [], evesIdx: 0,
   npcA: null, npcB: null,
   oldMan: null, newsAnim: 0,
-  settingsOpen: false,
+  cutscene: null,
+  cutsceneDone: false,
+  redLight: null,
+  redCylinder: null,
+  fryerOil: null,
   currentSaveKey: null,
   handlersInit: false,
   doorPiv: null, divPiv: null,
@@ -527,7 +557,8 @@ function dropIt() {
 
 // ===== SAVE SYSTEM =====
 // Show main menu at startup
-document.getElementById('main-menu').style.display = 'flex';
+var mm = document.getElementById('main-menu');
+if (mm) mm.style.display = 'flex';
 G.init = false;
 
 function cloneSlots(arr) {
@@ -548,6 +579,7 @@ function customerData(c) { return {x:c.x,z:c.group?c.group.position.z:c.z,order:
 function getSaveData() {
   var d={
     day:G.day,phase:G.phase,money:G.money,eavesdropped:G.eavesdropped,
+    oldManTalked:G.oldManTalked,cutsceneDone:G.cutsceneDone,
     px:G.camera.position.x,py:G.camera.position.y,pz:G.camera.position.z,yaw:G.yaw,pitch:G.pitch,
     carried:serializeItem(G.carried),
     dOpen:G.dOpen,rdOpen:G.rdOpen||false,
@@ -630,6 +662,7 @@ function createTrayObject(){
 
 function restoreGState(data){
   G.day=data.day||1;G.money=data.money||0;G.eavesdropped=data.eavesdropped||false;
+  G.oldManTalked=data.oldManTalked||false;G.cutsceneDone=data.cutsceneDone||false;
   G.camera.position.set(data.px||0,data.py||1.7,data.pz||4.5);G.yaw=data.yaw||0;G.pitch=data.pitch||0;
   G.dOpen=data.dOpen||false;G.rdOpen=data.rdOpen||false;
   G.restActive=data.restActive||false;G.restInfinite=data.restInfinite||false;G.restTimer=data.restTimer||0;
@@ -708,6 +741,7 @@ function loadGameFromKey(key){
         if(G.restActive){
           if(G.restInfinite){document.getElementById('day-hud').textContent='休息时间';}else{document.getElementById('day-hud').textContent='休息时间: '+Math.floor(G.restTimer/60)+':'+(Math.floor(G.restTimer%60)<10?'0':'')+Math.floor(G.restTimer%60);}
           G.phase='resting';
+          if(data.cutsceneDone) document.getElementById('space-hint').style.display='block';
         }else{
           G.phase='waiting';
           if(!G.restActive&&(!data.customers||data.customers.length===0)){spawnCustomers();}
@@ -797,8 +831,11 @@ function newGame() {
   G.init = false;
   G.day = 1; G.phase = 'ordering'; G.money = 0;
   G.eavesdropped = false;
+  G.oldManTalked = false;
+  G.cutsceneDone = false;
   G.settingsOpen = false;
   G.currentSaveKey = key;
+  document.getElementById('space-hint').style.display = 'none';
   saveToSlot(key); // auto-save initial state
   document.getElementById('total-earnings').textContent = '💰 累计收入: 0元';
   document.getElementById('main-menu').style.display = 'none';
@@ -889,6 +926,12 @@ function returnToMenu() {
   document.getElementById('order-paper').style.display = 'none';
   document.getElementById('result-screen').style.display = 'none';
   document.getElementById('gameover-screen').style.display = 'none';
+  document.getElementById('space-hint').style.display = 'none';
+  document.getElementById('monologue-text').style.display = 'none';
+  if(G.redLight){G.scene.remove(G.redLight);G.redLight=null;}
+  if(G.redCylinder){G.scene.remove(G.redCylinder);G.redCylinder=null;}
+  var bov=document.getElementById('blink-overlay');if(bov)bov.parentNode.removeChild(bov);
+  G.oldManTalked=false;G.cutscene=null;G.cutsceneDone=false;
 }
 
 function showConfirm(msgText, onYes, singleButton) {
@@ -1146,6 +1189,7 @@ function startGame() {
     bb.position.y = 0.5; fG.add(bb);
     var oo = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.08, 20), new THREE.MeshStandardMaterial({ color: 0xcc9900, roughness: 0.3 }));
     oo.position.y = 0.57; fG.add(oo);
+    G.fryerOil = oo;
     G.fSlots = [
       { p: [-0.25, 0, -0.25], o: 0, m: 0, ti: 0, s: 'e', r: 0 },
       { p: [0.25, 0, -0.25], o: 0, m: 0, ti: 0, s: 'e', r: 0 },
@@ -1293,6 +1337,7 @@ function startGame() {
       G.keys[k] = true;
 
       if (k === ' ' && G.locked && G.restActive && !G.restInfinite) { endRestTime(); return; }
+      if (k === ' ' && G.restActive && document.getElementById('space-hint').style.display === 'block') { endRestTime(); return; }
       if (k === ' ' && G.locked && G.phase === 'playing') G.renderer.domElement.requestPointerLock();
       if (k === 'v' && G.init) { if (!G.settingsOpen) openSettings(); else closeSettings(); return; }
       if (k === 'r' && G.paused && chatting) {
@@ -1354,11 +1399,12 @@ function startGame() {
               if (children[ci4].userData && children[ci4].userData.type === 'combo') {
                 var d = G.camera.position.distanceTo(children[ci4].position);
                 if (d < 2.5) { G.carried = children[ci4]; collRemove('comboSolid'); msg('拿起套餐'); return; }
+}
+
               }
             }
           }
         }
-      }
       if (k === 'x' && !G.paused && (G.phase === 'waiting' || G.phase === 'playing' || G.phase === 'resting')) {
         // NPC direct talk via crosshair
         if (G.npcA && G.npcB) {
@@ -1480,6 +1526,86 @@ function startGame() {
   }
 }
 
+// === CUTSCENE: DAY 3 FRYER VISION ===
+function startCutscene() {
+  G.cutscene = { phase: 'darken', timer: 0, monoIdx: -1, monoTimer: 0 };
+  G.locked = false;
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
+function updateCutscene(dt) {
+  var cs = G.cutscene;
+  cs.timer += dt;
+
+  if (cs.phase === 'darken') {
+    var t = Math.min(cs.timer / 0.8, 1);
+    var overlay = document.getElementById('blink-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div'); overlay.id = 'blink-overlay';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0);z-index:58;pointer-events:none;transition:none';
+      document.body.appendChild(overlay);
+    }
+    overlay.style.background = 'rgba(0,0,0,' + (0.55 * t) + ')';
+    if (!G.redLight) {
+      G.redLight = new THREE.PointLight(0xff2200, 0, 4);
+      G.redLight.position.set(0, 0.6, -3);
+      G.scene.add(G.redLight);
+    }
+    if (!G.redCylinder) {
+      var rcylGeom = new THREE.CylinderGeometry(1.8, 1.8, 4, 32);
+      var rcylMat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0, depthWrite: false });
+      G.redCylinder = new THREE.Mesh(rcylGeom, rcylMat);
+      G.redCylinder.position.set(0, 2, -3);
+      G.scene.add(G.redCylinder);
+    }
+    G.redCylinder.material.opacity = 0.25 * t;
+    G.redLight.intensity = t * 1.5;
+    if (G.fryerOil) G.fryerOil.material.color.setHex(Math.round(0xcc9900 + (0xff2200 - 0xcc9900) * t));
+    if (t >= 1) { cs.phase = 'blink_close'; cs.timer = 0; }
+  }
+  else if (cs.phase === 'blink_close') {
+    document.getElementById('blink-top').style.top = '0%';
+    document.getElementById('blink-bot').style.bottom = '0%';
+    if (cs.timer >= 0.18) { cs.phase = 'blink_hold'; cs.timer = 0; }
+  }
+  else if (cs.phase === 'blink_hold') {
+    if (cs.timer >= 0.12) { cs.phase = 'blink_open'; cs.timer = 0;
+      document.getElementById('blink-top').style.top = '-50%';
+      document.getElementById('blink-bot').style.bottom = '-50%';
+      // Remove dark overlay
+      var ov = document.getElementById('blink-overlay');
+      if (ov) { ov.style.background = 'rgba(0,0,0,0)'; ov.parentNode.removeChild(ov); }
+      if (G.redLight) { G.scene.remove(G.redLight); G.redLight = null; }
+      if (G.redCylinder) { G.scene.remove(G.redCylinder); G.redCylinder = null; }
+      if (G.fryerOil) G.fryerOil.material.color.setHex(0xcc9900);
+    }
+  }
+  else if (cs.phase === 'blink_open') {
+    if (cs.timer >= 0.18) { cs.phase = 'monologue'; cs.timer = 0; cs.monoIdx = 0; cs.monoTimer = 0;
+      document.getElementById('monologue-text').style.display = 'block';
+      document.getElementById('monologue-text').textContent = '怎么回事？';
+    }
+  }
+  else if (cs.phase === 'monologue') {
+    cs.monoTimer += dt;
+    var lines = ['怎么回事？', '是不是最近工作压力太大了？', '看来得早点睡觉了呀。'];
+    if (cs.monoIdx < 3) {
+      var showing = cs.monoTimer < 1.2;
+      document.getElementById('monologue-text').style.display = showing ? 'block' : 'none';
+      if (!showing && cs.monoTimer >= 1.5) {
+        cs.monoIdx++; cs.monoTimer = 0;
+        if (cs.monoIdx < 3) document.getElementById('monologue-text').textContent = lines[cs.monoIdx];
+      }
+    }
+    if (cs.monoIdx >= 3) {
+      document.getElementById('monologue-text').style.display = 'none';
+      G.cutscene = null; G.cutsceneDone = true;
+      document.getElementById('space-hint').style.display = 'block';
+      setTimeout(function() { G.renderer.domElement.requestPointerLock(); }, 200);
+    }
+  }
+}
+
 // Animation loop
 function animate() {
   if (!G.clock) return;
@@ -1510,6 +1636,16 @@ function animate() {
   G.camera.quaternion.setFromEuler(new THREE.Euler(G.pitch, G.yaw, 0, 'YXZ'));
 
   if (G.paused) { G.renderer.render(G.scene, G.camera); return; }
+
+  // === CUTSCENE SYSTEM ===
+  if (G.cutscene) {
+    updateCutscene(dt);
+  }
+  // Trigger check: Day 3 rest, oldManTalked, player at curtain, not yet done
+  if (!G.cutscene && !G.cutsceneDone && G.day>=3 && G.phase==='resting' && G.oldManTalked &&
+      G.camera.position.x>=-0.57 && G.camera.position.x<=0.57 && G.camera.position.z>=-5.9) {
+    startCutscene();
+  }
 
   // Carried item
   if (G.carried) {
