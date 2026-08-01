@@ -89,6 +89,49 @@ canvas{display:block}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js">
 </script>
+<div id="main-menu">
+  <div class="title">🍔 Steam Chef Simulator</div>
+  <div class="subtitle">蒸汽厨师模拟器</div>
+  <button onclick="newGame()">新的游戏</button>
+  <button onclick="loadGame()">读取存档</button>
+  <button onclick="showTutorial()">操作教程</button>
+</div>
+<div id="settings-menu">
+  <div class="stitle">⚙️ 游戏设置</div>
+  <button onclick="saveGame()">保存当前进度</button>
+  <button onclick="loadGame()">读取存档</button>
+  <button onclick="closeSettings()">返回游戏</button>
+  <button onclick="askReturnToMenu()">返回主菜单</button>
+</div>
+<div id="tutorial-panel">
+  <div class="ttitle">📖 操作教程</div>
+  <div class="tkeys">
+    <span>W</span>：人物向前移动<br>
+    <span>S</span>：人物向后移动<br>
+    <span>A</span>：人物向左移动<br>
+    <span>D</span>：人物向右移动<br>
+    <span>鼠标左键</span>：拿起食材、物品<br>
+    <span>Q键</span>：丢弃手中拿着的物品<br>
+    <span>X键</span>：靠近NPC，触发开启对话<br>
+    <span>R键</span>：对话界面中，确认切换下一句台词<br>
+    <span>Z键</span>：隔着墙壁偷听两名顾客聊天<br>
+    <span>V键</span>：打开游戏设置菜单<br>
+    <span>T键</span>：显示 / 隐藏顾客订单面板
+  </div>
+  <button onclick="closeTutorial()">关闭</button>
+</div>
+<div id="confirm-dialog">
+  <div class="cmsg" id="confirm-msg"></div>
+  <div class="cbtns">
+    <button class="yes" id="confirm-yes">是</button>
+    <button id="confirm-no">否</button>
+  </div>
+</div>
+<div id="save-list">
+  <div class="sltitle">📁 存档列表</div>
+  <div class="sllist" id="save-list-content"></div>
+  <button class="slclose" onclick="document.getElementById('save-list').style.display='none'">关闭</button>
+</div>
 <script>
 "use strict";
 
@@ -317,6 +360,18 @@ function selectOldChoice(idx) {
 
 function showOldClose() {
   typewrite('你先回去忙活吧，往后若是心里越发觉得不安、记起零碎古怪的往事，再来找我。', function() {
+    setTimeout(function() { 
+      var m=document.getElementById('message');
+      m.textContent='该回厨房休息了';
+      m.style.top='50%';m.style.left='50%';m.style.transform='translate(-50%,-50%)';
+      m.style.fontSize='42px';
+      m.classList.add('show');
+      setTimeout(function(){ 
+        m.classList.remove('show');
+        m.style.top='8%';m.style.left='50%';m.style.transform='translateX(-50%)';
+        m.style.fontSize='30px';
+      }, 1500);
+    }, 400);
     closeDialogue();
   });
 }
@@ -1214,7 +1269,21 @@ function startGame() {
     var trashL = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.05, 0.55), new THREE.MeshStandardMaterial({ color: 0x5a3520, roughness: 0.9 }));
     trashL.position.y = 0.43; tG.add(trashL);
     S.add(tG); mkZone(tG, 0.5, 0.5, 0.5, 0.3);
-     coll(7.2, 7.8, -0.75, -0.25);
+      coll(7.2, 7.8, -0.75, -0.25);
+
+     // Day 3+ NPC pair and old man (independent of spawnCustomers)
+     if (G.day >= 3 && !G.npcA) {
+       G.npcA = makeNPC(4, -6.8, 0, 0x8888ff);
+       G.npcB = makeNPC(4, -7.8, Math.PI, 0xff8888);
+     }
+     if (G.day >= 3 && !G.oldMan) {
+       G.oldMan = createOldMan();
+       G.oldMan.position.set(-10.0, 0, 2.8);
+       G.oldMan.rotation.y = Math.PI;
+       G.oldMan.scale.set(1.5, 1.5, 1.5);
+       G.scene.add(G.oldMan);
+       coll(-10.3, -9.7, 2.5, 3.1, 'oldManCol');
+     }
 
       // ===== Event Handlers (register once) =====
      if (!G.handlersInit) {
@@ -2195,24 +2264,10 @@ function spawnCustomers() {
     zone.userData = { isInteractable: true, isCustomer: true, custIdx: ci };
     g.add(zone);
     G.zones.push(zone);
-    G.customers.push(cust);
-    coll(cx-0.4, cx+0.4, cz-0.4, cz+0.4, 'cust'+ci);
-  }
-  // Day 3+ NPC pair behind back wall
-  if (G.day >= 3 && !G.npcA) {
-    G.npcA = makeNPC(4, -6.8, 0, 0x8888ff); // blue, face +Z
-    G.npcB = makeNPC(4, -7.8, Math.PI, 0xff8888); // red, face -Z
-  }
-  // Day 3+ old man in bathroom (low-poly geometric style)
-  if (G.day >= 3 && !G.oldMan) {
-    G.oldMan = createOldMan();
-    G.oldMan.position.set(-10.0, 0, 2.8);
-    G.oldMan.rotation.y = Math.PI;
-    G.oldMan.scale.set(1.5, 1.5, 1.5);
-    G.scene.add(G.oldMan);
-    coll(-10.3, -9.7, 2.5, 3.1, 'oldManCol');
-  }
-  msg('走到前台跟顾客对话接单', 3000);
+     G.customers.push(cust);
+     coll(cx-0.4, cx+0.4, cz-0.4, cz+0.4, 'cust'+ci);
+   }
+   msg('走到前台跟顾客对话接单', 3000);
 }
 function showPaper(order) {
   var el = document.getElementById('order-paper');
@@ -2356,50 +2411,6 @@ function createWaiter() {
 // Override the material setting on pointer lock
 // (The setTimeout handles pointer lock after render starts)
 
-
 </script>
-<div id="main-menu">
-  <div class="title">🍔 Steam Chef Simulator</div>
-  <div class="subtitle">蒸汽厨师模拟器</div>
-  <button onclick="newGame()">新的游戏</button>
-  <button onclick="loadGame()">读取存档</button>
-  <button onclick="showTutorial()">操作教程</button>
-</div>
-<div id="settings-menu">
-  <div class="stitle">⚙️ 游戏设置</div>
-  <button onclick="saveGame()">保存当前进度</button>
-  <button onclick="loadGame()">读取存档</button>
-  <button onclick="closeSettings()">返回游戏</button>
-  <button onclick="askReturnToMenu()">返回主菜单</button>
-</div>
-<div id="tutorial-panel">
-  <div class="ttitle">📖 操作教程</div>
-  <div class="tkeys">
-    <span>W</span>：人物向前移动<br>
-    <span>S</span>：人物向后移动<br>
-    <span>A</span>：人物向左移动<br>
-    <span>D</span>：人物向右移动<br>
-    <span>鼠标左键</span>：拿起食材、物品<br>
-    <span>Q键</span>：丢弃手中拿着的物品<br>
-    <span>X键</span>：靠近NPC，触发开启对话<br>
-    <span>R键</span>：对话界面中，确认切换下一句台词<br>
-    <span>Z键</span>：隔着墙壁偷听两名顾客聊天<br>
-    <span>V键</span>：打开游戏设置菜单<br>
-    <span>T键</span>：显示 / 隐藏顾客订单面板
-  </div>
-  <button onclick="closeTutorial()">关闭</button>
-</div>
-<div id="confirm-dialog">
-  <div class="cmsg" id="confirm-msg"></div>
-  <div class="cbtns">
-    <button class="yes" id="confirm-yes">是</button>
-    <button id="confirm-no">否</button>
-  </div>
-</div>
-<div id="save-list">
-  <div class="sltitle">📁 存档列表</div>
-  <div class="sllist" id="save-list-content"></div>
-  <button class="slclose" onclick="document.getElementById('save-list').style.display='none'">关闭</button>
-</div>
 </body>
 </html>
