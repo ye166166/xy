@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ff5a5f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>爆款文案雷达 · 视频号/抖音/小红书</title>
+<style>
+:root{
+  --bg:#f6f7fb;
+  --card:#ffffff;
+  --ink:#1a1d26;
+  --ink-2:#6b7280;
+  --ink-3:#9aa1ad;
+  --line:#eceef3;
+  --brand:#ff5a5f;
+  --brand-g:#ff8a5c;
+  --dy:#1a1a1a;
+  --xhs:#ff2442;
+  --shipin:#07c160;
+  --like:#ff5a5f;
+  --radius:16px;
+  --shadow:0 2px 12px rgba(20,24,40,.06);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","HarmonyOS Sans","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--ink);
+  max-width:560px;margin:0 auto;padding-bottom:70px;
+  -webkit-font-smoothing:antialiased;
+}
+::-webkit-scrollbar{display:none}
+.page{display:none;padding:0 14px 20px;animation:fadein .25s ease}
+.page.active{display:block}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ---------- header ---------- */
+.appbar{
+  position:sticky;top:0;z-index:50;
+  background:linear-gradient(135deg,var(--brand),var(--brand-g));
+  color:#fff;padding:14px 14px 16px;border-radius:0 0 22px 22px;
+  box-shadow:0 4px 18px rgba(255,90,95,.28);
+}
+.appbar .row{display:flex;align-items:center;justify-content:space-between}
+.appbar h1{font-size:19px;font-weight:800;letter-spacing:.5px}
+.appbar h1 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#fff;margin-right:6px;animation:blink 1.6s infinite}
+@keyframes blink{50%{opacity:.35}}
+.appbar .sub{font-size:11px;opacity:.85;margin-top:3px}
+.searchwrap{margin-top:12px;display:flex;gap:8px}
+.searchbox{
+  flex:1;display:flex;align-items:center;gap:8px;background:#fff;border-radius:14px;padding:10px 14px;
+}
+.searchbox svg{flex:none;opacity:.45}
+.searchbox input{border:none;outline:none;flex:1;font-size:14px;background:transparent;color:var(--ink)}
+.searchbox input::placeholder{color:var(--ink-3)}
+.searchbox .clear{font-size:13px;color:var(--ink-3);padding:2px;display:none}
+.searchbox .clear.show{display:block}
+.searchbtn{background:#fff;color:var(--brand);font-weight:700;font-size:13px;border:none;border-radius:14px;padding:0 16px;cursor:pointer}
+.hotkw{margin-top:10px;display:flex;gap:8px;overflow-x:auto;white-space:nowrap;padding-bottom:2px}
+.hotkw span{font-size:11px;background:rgba(255,255,255,.22);color:#fff;padding:5px 12px;border-radius:99px;cursor:pointer;flex:none}
+
+/* ---------- chips ---------- */
+.chips{display:flex;gap:8px;margin:14px 2px 4px;overflow-x:auto}
+.chip{
+  flex:none;font-size:13px;font-weight:600;padding:8px 16px;border-radius:99px;
+  background:#fff;color:var(--ink-2);border:1px solid var(--line);cursor:pointer;transition:.15s;
+}
+.chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chip .count{font-size:10px;opacity:.6;margin-left:2px}
+.sortbar{display:flex;align-items:center;gap:10px;margin:10px 2px 12px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+.sortbar .sort{font-size:12px;color:var(--ink-3);cursor:pointer;padding:4px 2px;display:flex;align-items:center;gap:2px;flex:none}
+.sortbar .sort.active{color:var(--brand);font-weight:700}
+.sortbar .countlabel{margin-left:auto;flex:none;padding-left:6px}
+.sortbar .countlabel{margin-left:auto;font-size:11px;color:var(--ink-3)}
+
+/* ---------- cards ---------- */
+.card{
+  background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+  margin-bottom:14px;overflow:hidden;cursor:pointer;transition:transform .12s;
+}
+.card:active{transform:scale(.985)}
+.card .badge{
+  display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:#fff;
+  padding:3px 8px;border-radius:6px;margin:14px 14px 0;
+}
+.badge.dy{background:var(--dy)}
+.badge.xhs{background:var(--xhs)}
+.badge.sp{background:var(--shipin)}
+.badge svg{width:11px;height:11px;fill:#fff}
+.catchip{
+  display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
+  padding:3px 8px;border-radius:6px;margin:14px 14px 0;border:1px solid transparent;
+}
+.catchip.c0{background:#ffecec;color:#ff5a5f;border-color:#ffd6d6}
+.catchip.c1{background:#eef0ff;color:#6366f1;border-color:#dfe3ff}
+.catchip.c2{background:#fff7e6;color:#f59e0b;border-color:#ffe9bf}
+.catchip.c3{background:#ffe9f4;color:#ec4899;border-color:#ffd2e8}
+.scorechip{
+  display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;
+  background:linear-gradient(135deg,#fff7e6,#ffe9f4);color:#e8590c;border:1px solid #ffe0c2;
+  padding:3px 8px;border-radius:6px;margin:14px 14px 0;
+}
+.scorechip b{font-size:12px}
+.card .title{font-size:16px;font-weight:700;line-height:1.4;padding:10px 14px 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card .excerpt{font-size:13px;color:var(--ink-2);line-height:1.6;padding:8px 14px 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card .tags{display:flex;gap:6px;padding:10px 14px 0;flex-wrap:wrap}
+.tag{font-size:10px;color:var(--brand);background:#fff1f1;border:1px solid #ffe1e1;padding:3px 8px;border-radius:6px}
+.author{
+  display:flex;align-items:center;gap:10px;padding:12px 14px;margin-top:10px;
+  border-top:1px solid var(--line);
+}
+.avatar{
+  width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:18px;color:#fff;flex:none;
+}
+.author .info{flex:1;min-width:0}
+.author .name{font-size:13px;font-weight:700;display:flex;align-items:center;gap:4px}
+.author .name .v{color:#fff;background:var(--brand);font-size:9px;padding:1px 4px;border-radius:4px;font-style:normal}
+.author .fans{font-size:11px;color:var(--ink-3);margin-top:2px}
+.author .vip{display:flex;align-items:center;justify-content:center;width:14px;height:14px;flex:none;margin-left:2px}
+.followbtn{
+  flex:none;font-size:12px;font-weight:700;padding:6px 14px;border-radius:99px;
+  background:var(--brand);color:#fff;cursor:pointer;border:none;
+}
+.followbtn.following{background:#f1f2f5;color:var(--ink-2)}
+.stats{display:flex;gap:0;background:#fafbfd;padding:10px 0;border-top:1px solid var(--line)}
+.stat{flex:1;text-align:center;font-size:11px;color:var(--ink-3);display:flex;align-items:center;justify-content:center;gap:4px}
+.stat b{color:var(--ink);font-weight:700}
+.stat svg{opacity:.55}
+.actions{display:flex;border-top:1px solid var(--line)}
+.act{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:5px;
+  font-size:12px;color:var(--ink-2);padding:11px 0;cursor:pointer;
+}
+.act.liked{color:var(--like)}
+.act.liked svg{fill:var(--like)}
+.act.saved{color:#f5a623}
+.act svg{flex:none}
+
+/* ---------- tabs ---------- */
+.tabbar{
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:560px;height:60px;background:rgba(255,255,255,.96);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-top:1px solid var(--line);display:flex;z-index:60;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;color:var(--ink-3);cursor:pointer}
+.tab.active{color:var(--brand)}
+.tab svg{width:22px;height:22px}
+
+/* ---------- detail sheet ---------- */
+.sheet{
+  position:fixed;inset:0;z-index:100;display:none;
+}
+.sheet.show{display:block}
+.sheet .mask{position:absolute;inset:0;background:rgba(0,0,0,.45);animation:fadein .2s}
+.sheet .body{
+  position:absolute;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;
+  background:#fff;border-radius:22px 22px 0 0;max-height:88vh;overflow-y:auto;
+  animation:slideup .28s cubic-bezier(.2,.8,.2,1);
+  padding:14px 18px 30px;
+}
+@keyframes slideup{from{transform:translateY(40%);opacity:.4}to{transform:none;opacity:1}}
+.sheet .handle{width:40px;height:4px;border-radius:99px;background:#e5e7ec;margin:4px auto 14px}
+.sheet .close{position:absolute;top:14px;right:16px;font-size:13px;color:var(--ink-2);background:#f1f2f5;padding:6px 12px;border-radius:99px;cursor:pointer;z-index:2}
+
+/* ---------- blogger profile ---------- */
+.profile .cover{height:70px;border-radius:14px;background:linear-gradient(120deg,var(--brand),var(--brand-g));margin-bottom:-30px}
+.profile .avatarbig{width:72px;height:72px;border-radius:50%;font-size:34px;display:flex;align-items:center;justify-content:center;color:#fff;margin:0 4px 12px;border:3px solid #fff;box-shadow:var(--shadow)}
+.profile h2{font-size:19px;font-weight:800;display:flex;align-items:center;gap:6px}
+.profile h2 .v{color:#fff;background:var(--brand);font-size:10px;padding:2px 5px;border-radius:4px}
+.profile .bio{font-size:12px;color:var(--ink-2);line-height:1.6;margin:6px 0 14px}
+.fansgrid{display:flex;background:#fafbfd;border-radius:14px;padding:14px 0;margin-bottom:16px;border:1px solid var(--line)}
+.fansgrid .cell{flex:1;text-align:center}
+.fansgrid .cell b{display:block;font-size:16px;font-weight:800}
+.fansgrid .cell span{font-size:10px;color:var(--ink-3)}
+.recenthead{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin:6px 2px 10px}
+.recenthead .more{margin-left:auto;font-size:11px;color:var(--ink-3);font-weight:400}
+
+/* ---------- copy detail ---------- */
+.detail .plink{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-3);margin-bottom:12px}
+.detail .plink b{color:var(--brand)}
+.detail .dtitle{font-size:19px;font-weight:800;line-height:1.45;margin-bottom:12px}
+.copybox{
+  background:#f7f8fb;border-radius:14px;padding:14px;font-size:14px;line-height:1.8;color:#2c3038;
+  border:1px dashed #d9dde5;white-space:pre-wrap;word-break:break-word;
+}
+.copybox .ctitle{font-size:12px;font-weight:700;color:var(--ink-3);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.copybtn{
+  width:100%;margin-top:14px;background:linear-gradient(135deg,var(--brand),var(--brand-g));color:#fff;
+  border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;
+}
+.hookline{font-size:12px;color:var(--ink-3);text-align:center;margin-top:8px}
+.detail .secline{display:flex;gap:8px;margin:16px 0 10px;flex-wrap:wrap}
+.sec{font-size:10px;color:var(--ink-2);background:#f1f2f5;padding:4px 10px;border-radius:99px}
+.scorewrap{background:linear-gradient(135deg,#fff7f2,#fff1f6);border:1px solid #ffe4d9;border-radius:14px;padding:14px;margin-bottom:16px}
+.scorehead{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--ink-2);margin-bottom:10px}
+.scorehead b{font-size:20px;color:var(--brand);font-weight:800}
+.scorebar{height:8px;background:#ffe4d9;border-radius:99px;overflow:hidden}
+.scorebar i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand-g));border-radius:99px}
+.scoreitems{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.scoreitem{flex:1;min-width:76px;text-align:center;font-size:10px;color:var(--ink-3)}
+.scoreitem b{display:block;font-size:14px;color:var(--ink);font-weight:800;margin-bottom:2px}
+.relatedhead{font-size:13px;font-weight:700;margin:18px 0 10px}
+
+/* ---------- favorites / mine ---------- */
+.empty{
+  text-align:center;padding:70px 30px;color:var(--ink-3);font-size:13px;
+}
+.empty .big{font-size:46px;margin-bottom:12px}
+.historylist .card{margin-bottom:12px}
+.minecell{
+  display:flex;align-items:center;gap:12px;background:#fff;border-radius:14px;box-shadow:var(--shadow);
+  padding:14px;margin-bottom:12px;cursor:pointer;
+}
+.minecell .icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#ffe3e4,#fff0d9);display:flex;align-items:center;justify-content:center;font-size:18px}
+.minecell .t{font-size:14px;font-weight:600}
+.minecell .s{font-size:11px;color:var(--ink-3);margin-top:2px}
+.minecell .go{margin-left:auto;color:var(--ink-3);font-size:12px}
+.mineprofile{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden}
+.mp-cover{height:64px;background:linear-gradient(120deg,var(--brand),var(--brand-g))}
+.mp-row{display:flex;align-items:center;gap:12px;padding:0 14px 14px;margin-top:-22px}
+.mp-avatar{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#ffe3e4,#fff0d9);border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:var(--shadow);flex:none}
+.mp-name{font-size:16px;font-weight:800}
+.mp-sub{font-size:11px;color:var(--ink-3);margin-top:3px}
+.statrow{display:flex;gap:10px;margin-bottom:14px}
+.statrow .box{flex:1;background:#fff;border-radius:14px;box-shadow:var(--shadow);padding:14px;text-align:center}
+.statrow .box b{font-size:22px;font-weight:800;color:var(--brand)}
+.statrow .box span{font-size:11px;color:var(--ink-3)}
+.exportbtn{
+  flex:1;background:linear-gradient(135deg,var(--brand),var(--brand-g));color:#fff;border:none;
+  border-radius:14px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;
+}
+.exportbtn.ghost{background:#fff;color:var(--ink-2);border:1px solid var(--line)}
+.edlabel{font-size:12px;font-weight:700;color:var(--ink-3);margin:4px 2px 8px}
+.edinput{
+  width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:15px;
+  outline:none;margin-bottom:16px;background:#fafbfd;color:var(--ink);
+}
+.edinput:focus,.edtextarea:focus{border-color:var(--brand);background:#fff}
+.edtextarea{
+  width:100%;min-height:240px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+  font-size:14px;line-height:1.7;outline:none;background:#fafbfd;color:var(--ink);
+  resize:vertical;font-family:inherit;
+}
+
+/* ---------- toast ---------- */
+.toast{
+  position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);
+  background:rgba(20,22,28,.92);color:#fff;font-size:13px;padding:10px 18px;border-radius:99px;
+  z-index:200;opacity:0;pointer-events:none;transition:.25s;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.skeleton{padding:4px 0}
+.sk{background:#eef0f5;border-radius:var(--radius);height:170px;margin-bottom:14px;animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.5}}
+</style>
+</head>
+<body>
+
+<!-- ================= 顶栏 ================= -->
+<header class="appbar">
+  <div class="row">
+    <h1><span class="dot"></span>爆款文案雷达</h1>
+    <div style="font-size:11px;opacity:.9;background:rgba(255,255,255,.2);padding:4px 10px;border-radius:99px">视频号 · 抖音 · 小红书</div>
+  </div>
+  <div class="sub">每日更新 400+ 条爆款文案 · 四大主题 + 博主数据</div>
+  <div class="searchwrap">
+    <div class="searchbox">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#666" stroke-width="2"/><path d="M20 20l-3.5-3.5" stroke="#666" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="kw" type="search" placeholder="搜索爆款文案 / 博主 / 关键词" autocomplete="off">
+      <span class="clear" id="kwClear">✕</span>
+    </div>
+    <button class="searchbtn" onclick="doSearch()">搜索</button>
+  </div>
+  <div class="hotkw" id="hotkw"></div>
+</header>
+
+<!-- ================= 首页 ================= -->
+<main id="page-home" class="page active">
+  <div class="chips" id="platformChips"></div>
+  <div class="sortbar" id="sortbar"></div>
+  <div id="dailybar"></div>
+  <div id="list"></div>
+</main>
+
+<!-- ================= 发现 ================= -->
+<main id="page-find" class="page">
+  <h2 style="font-size:17px;font-weight:800;margin:16px 2px 6px">今日热门话题</h2>
+  <p style="font-size:12px;color:var(--ink-3);margin:0 2px 14px">根据爆款文案聚合的热点话题</p>
+  <div id="topics"></div>
+  <h2 style="font-size:17px;font-weight:800;margin:20px 2px 6px">热门博主榜单</h2>
+  <p style="font-size:12px;color:var(--ink-3);margin:0 2px 14px">按粉丝量排名的爆款创作者</p>
+  <div id="ranklist"></div>
+</main>
+
+<!-- ================= 收藏 ================= -->
+<main id="page-save" class="page">
+  <h2 style="font-size:17px;font-weight:800;margin:16px 2px 4px">我的好文</h2>
+  <p style="font-size:12px;color:var(--ink-3);margin:0 2px 14px">收藏的文案存有完整快照，随时查看、提取、修改，不受每日换新影响</p>
+  <div id="favlist"></div>
+</main>
+
+<!-- ================= 我的 ================= -->
+<main id="page-mine" class="page">
+  <div class="mineprofile">
+    <div class="mp-cover"></div>
+    <div class="mp-row">
+      <div class="mp-avatar">🎯</div>
+      <div>
+        <div class="mp-name">爆款文案探索者</div>
+        <div class="mp-sub" id="mineUpdate">今日已更新 0 条爆款文案</div>
+      </div>
+    </div>
+  </div>
+  <div class="statrow">
+    <div class="box"><b id="mFav">0</b><span>好文收藏</span></div>
+    <div class="box"><b id="mLike">0</b><span>点赞文案</span></div>
+    <div class="box"><b id="mHis">0</b><span>浏览足迹</span></div>
+  </div>
+  <div class="minecell" onclick="switchPage('save')"><div class="icon">📖</div><div><div class="t">我的好文收藏</div><div class="s">查看、提取、编辑、导出收藏的好文</div></div><div class="go">›</div></div>
+  <div class="minecell" onclick="clearData()"><div class="icon">🗑</div><div><div class="t">清空浏览记录</div><div class="s">删除本地足迹与缓存</div></div><div class="go">›</div></div>
+  <div class="minecell" onclick="restoreDemo()"><div class="icon">🔄</div><div><div class="t">恢复演示数据</div><div class="s">重置为内置示例内容</div></div><div class="go">›</div></div>
+  <div class="minecell" onclick="toast('数据均保存在本机浏览器中')"><div class="icon">🔒</div><div><div class="t">数据说明</div><div class="s">当前为本地演示数据，可替换为真实接口</div></div><div class="go">›</div></div>
+</main>
+
+<!-- ================= 详情弹层 ================= -->
+<div class="sheet" id="sheet">
+  <div class="mask" onclick="closeSheet()"></div>
+  <div class="body" id="sheetBody"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================
+   爆款文案雷达 · 本地演示数据
+   结构: { id, platform: 'dy'|'xhs'|'sp', title, content, tags[],
+           author:{name, avatar(emoji), color, fans, likes, works, bio, verified},
+           likes, comments, collects, date, hook }
+   ===================================================== */
+/* =====================================================
+   爆款文案雷达 · 每日更新生成引擎（本地演示）
+   基于「日期种子」每天生成 400+ 条最新爆款文案，
+   当天内容稳定，次日自动换新。可点「换一批」重新生成。
+   结构: { id, cat, platform, title, content, tags[],
+           author:{name,avatar,color,fans,likes,works,bio,verified},
+           likes,comments,collects,date,hook }
+   接入真实数据：把 buildDaily() 换成接口返回即可。
+   ===================================================== */
+const CAT_LIST = ['情感共鸣','人生感悟','智慧人生','女性成长'];
+const PLATFORMS = ['dy','xhs','sp'];
+const ITEM_COUNT = 420;
+
+const AUTHOR_POOL = [
+  ['深夜书房','📖','6366f1','8b5cf6','sp',1800000,4200000,52000000,2409,'每晚9点，用文字治愈你的焦虑',1],
+  ['人间清醒','🌃','1a1a1a','475569','dy',3800000,7200000,88000000,1988,'每天一条扎心又清醒的内容，陪你聊聊心里话',1],
+  ['情感电台FM','🎧','ec4899','f472b6','xhs',1400000,2800000,36000000,1543,'收留每一个深夜emo的灵魂 | 情感树洞',1],
+  ['柠檬树下','🍋','f59e0b','fbbf24','dy',560000,1200000,13000000,765,'一个写过一千个爱情故事的人 | 治愈系',0],
+  ['温暖瞬间','🏠','07c160','4ade80','sp',2600000,5200000,65000000,3108,'记录平凡人的温暖瞬间，每天一条正能量',1],
+  ['周先生的信','✉️','64748b','94a3b8','sp',980000,2100000,24000000,1120,'写给中年的你，一封信一段话 | 人生感悟专栏',0],
+  ['人间观察员','👀','3b82f6','60a5fa','dy',3200000,6200000,76000000,2231,'一个爱观察生活细节的博主 | 只讲真话',1],
+  ['治愈系馆主','🫧','8b5cf6','a78bfa','xhs',760000,1500000,17000000,986,'心理学科班出身，和你聊聊情绪与自洽',0],
+  ['禅意生活','🪷','0d9488','14b8a6','dy',4200000,8200000,96000000,3021,'分享生活禅意与处世智慧',1],
+  ['明白人老李','🦉','b45309','d97706','xhs',480000,1100000,9800000,672,'五十岁老李，讲点你迟早会明白的道理',0],
+  ['慧心语录','🧘','07c160','34d399','sp',1900000,3600000,43000000,1876,'每天一句智慧心法，点亮你的人生',1],
+  ['清醒记','💡','e11d48','fb7185','dy',2600000,5200000,61000000,2109,'专注认知升级与逆袭干货',1],
+  ['言值说话课','🗣️','db2777','f472b6','xhs',620000,1300000,12000000,806,'教你把话说到人心坎里 | 高情商表达',0],
+  ['独立女性成长社','🌸','ec4899','f9a8d4','xhs',1250000,2600000,29000000,1342,'陪每一个女孩，活成自己喜欢的样子',1],
+  ['女人知心话','💃','a855f7','c084fc','xhs',880000,1700000,19000000,1108,'一个陪千万女性悄悄变强的号',0],
+  ['徐姐谈成长','💪','f43f5e','fb7185','dy',2300000,4600000,53000000,1677,'徐姐，一个把日子过成热播剧的女人',1],
+  ['三草成长记','🌿','059669','34d399','sp',520000,1100000,8900000,598,'95后创业者，分享女性成长与自我提升',0],
+  ['星光不问赶路人','🌟','1e40af','3b82f6','sp',1100000,2400000,22000000,1450,'愿陪你走过每一个迷茫的深夜',0],
+  ['独处的月亮','🌙','6d28d9','8b5cf6','xhs',720000,1600000,15000000,920,'一个人也要把日子过成诗',0],
+  ['路上有风','🏔️','047857','10b981','dy',950000,2000000,16000000,1103,'在路上，遇见更好的自己',0],
+  ['人生驿站','🚂','334155','64748b','sp',900000,2000000,18000000,890,'人生路上的加油站',0],
+  ['灯火阑珊','🏮','d97706','f59e0b','sp',1300000,2800000,26000000,1230,'深夜的一盏灯，陪你说晚安',0],
+  ['时间的答案','⏳','0f766e','14b8a6','sp',1100000,2400000,21000000,1540,'把岁月熬成汤，讲给你听',0],
+  ['一席话','🫖','b45309','fbbf24','sp',800000,1800000,15000000,670,'一席话，讲透一个道理',0],
+  ['静水流深','🌊','1e40af','60a5fa','sp',1500000,3200000,30000000,1760,'静水之下，自有深流',1],
+  ['岁月静好','🌾','15803d','4ade80','sp',1000000,2200000,19000000,1350,'记录平淡日子里的闪光',0],
+  ['人生海海','🛶','7c3aed','a78bfa','sp',1200000,2600000,24000000,1400,'人生海海，陪你渡一程',0],
+  ['晚风说','🌬️','4f46e5','818cf8','sp',700000,1600000,13000000,520,'晚风起时，说给你听',0],
+  ['禅茶一味','🍵','166534','22c55e','sp',1400000,3000000,27000000,1620,'禅茶一味，静心即是修行',0],
+  ['倾听者老陈','🧓','57534e','a8a29e','sp',600000,1300000,11000000,880,'认真听你说心里话的老陈',0],
+  ['情绪教练老K','🧭','ea580c','fb923c','dy',1600000,3400000,35000000,1900,'教你掌控情绪，不被情绪掌控',0],
+  ['深夜电台王','🎙️','0ea5e9','38bdf8','dy',2200000,4800000,55000000,2600,'午夜十二点，声音伴你入眠',1],
+  ['大实话先生','🗣️','111827','374151','dy',2900000,6200000,82000000,3100,'只说大实话，扎心但有用',1],
+  ['清醒人类图鉴','🧠','7c3aed','c084fc','dy',1300000,2900000,27000000,1250,'人间清醒图鉴，看懂少走弯路',0],
+  ['拆解生活','🔍','0369a1','38bdf8','dy',1100000,2400000,21000000,1100,'把复杂的生活，拆给你看',0],
+  ['正能量的光','☀️','f59e0b','fde047','dy',2000000,4400000,48000000,2200,'自带光芒，也照亮你',1],
+  ['情感侦探社','🕵️','9d174d','f472b6','dy',1500000,3200000,32000000,1800,'专治感情里的疑难杂症',0],
+  ['清醒的羊','🐑','166534','84cc16','dy',800000,1700000,14000000,640,'一只很清醒的羊，分享成长干货',0],
+  ['说透人生','🗿','44403c','a8a29e','dy',1700000,3800000,36000000,2000,'把人生这回事，说透',0],
+  ['逆袭研究所','🚀','4338ca','6366f1','dy',1900000,4100000,44000000,2300,'研究普通人逆袭的底层逻辑',1],
+  ['从心出发','🧡','f97316','fdba74','xhs',900000,1900000,16000000,980,'所有答案，都在心里',0],
+  ['爱自己日记','📔','ec4899','f9a8d4','xhs',1300000,2700000,25000000,1500,'每天写一封给自己的情书',0],
+  ['姐姐有话讲','👩','9333ea','c084fc','xhs',1400000,3000000,28000000,1680,'姐姐走过的路，都讲给你听',0],
+  ['女孩的底气','🛡️','db2777','f472b6','xhs',1200000,2500000,22000000,1400,'你的底气，来自你自己',0],
+  ['清醒小姐','🥂','0ea5e9','7dd3fc','xhs',1000000,2200000,19000000,1300,'陪你清醒地变强大',0],
+  ['温柔且有力量','🦋','a21caf','e879f9','xhs',1500000,3200000,31000000,1700,'温柔是底色，力量是盔甲',1],
+  ['拾光者','📸','0891b2','22d3ee','xhs',800000,1700000,15000000,760,'拾起生活里的每一寸光',0],
+  ['慢慢变好','🌱','4d7c0f','a3e635','xhs',950000,2000000,17000000,1050,'不用急，你会慢慢变好',0],
+  ['灵魂拷问官','🎯','ef4444','fca5a5','xhs',1100000,2400000,20000000,1200,'一个敢问醒你的账号',0],
+  ['向阳而生','🌻','d97706','fde68a','xhs',1300000,2800000,24000000,1350,'无论风雨，向阳而生',0]
+];
+
+const FILLER = {
+ '情感共鸣':['他转身关上门的那一刻','爸爸扛起米袋的背影','一个人吃火锅的深夜','她说“没事”的时候','隔着屏幕道别的那句晚安','最后一次通话的忙音','妈妈偷偷塞进包里的钱','爷爷整理老照片的手','那句没来得及说的再见','等不来的那句道歉','凌晨下班空荡的地铁','删了又加的聊天记录','空了的座位和凉了的饭','没说出口的生日快乐'],
+ '人生感悟':['你不再发朋友圈','朋友越来越少的年纪','开始喜欢安静独处','明白了平凡可贵','不再和过去较劲','接受了父母的老去','把“以后”换成了“现在”','不再执着别人的认可','开始和自己和解','戒掉了情绪内耗','懂得给别人留余地','不再解释自己','看淡了得失起落','学会了放过自己'],
+ '智慧人生':['遇事不慌','懂得适时沉默','把情绪留给值得的人','不在烂人烂事上纠缠','先听后说','在低谷期蛰伏','给别人留台阶','控制欲望','稳得住自己','远离无效社交','让善良带点锋芒','不把话说满','向下扎根','懂得取舍'],
+ '女性成长':['经济独立','学会说“不”','不再讨好任何人','把时间还给自己','独自搬家','30岁重新出发','掌控自己的情绪','给自己买一束花','戒掉恋爱脑','第一次独自旅行','和原生家庭和解','摆脱身材焦虑','存款六位数','不再等别人来爱']
+};
+
+const TITLE_T = {
+ '情感共鸣':['「{F}」这个视频我看了十遍','成年人的崩溃，往往就在{F}','妈妈发来的那条语音，{F}','深夜翻到{F}，我哭了很久','原来{F}，才是最扎心的','如果{F}，请别一个人硬扛','那些没说出口的话，{F}','你知道吗？{F}','{F}，看完评论区全是泪','{F}，转发给那个懂你的人'],
+ '人生感悟':['{F}，你才算真正长大了','到了一定年纪，{F}','人这一生，{F}就够了','为什么越长大，越喜欢{F}？','{F}，是成年人最高级的自律','看完这个，我再也不纠结{F}了','{F}，才是人生最好的活法','写给那个正在{F}的你','真正的成熟，从{F}开始','余生很长，请把{F}变成习惯'],
+ '智慧人生':['真正厉害的人，都懂得{F}','{F}，才是人生大智慧','层次越高的人，越擅长{F}','如果你能做到{F}，你就赢了','30岁后，请逼自己学会{F}','{F}的人，运气都不会太差','老祖宗留下的智慧：{F}','看懂{F}，你就活明白了','{F}，是一个人最好的风水','真正聪明的人，都在这件事上{F}'],
+ '女性成长':['女孩子，一定要学会{F}','一个女人最顶级的清醒，是{F}','30岁前，请逼自己做到{F}','当{F}，你的人生就开始变好了','写给正在{F}的你，早点看到该多好','{F}，是女人最好的底牌','真正厉害的女人，都在悄悄{F}','过了30岁才懂：{F}太重要了','每天坚持{F}，你会感谢自己','愿你早日实现{F}，闪闪发光']
+};
+
+const CONTENT_T = {
+ '情感共鸣':[
+ '你有没有过这样的时刻：\n\n{F}。\n\n那一瞬间，所有的坚强都塌了。\n\n可你连哭，都要选一个没人的角落。\n\n如果可以，今晚别硬扛了。\n\n抱抱自己，明天太阳照常升起。',
+ '晚上十一点，地铁上几乎没人。\n\n{F}，这句话在我心里压了很久。\n\n我发了一条朋友圈，又秒删。\n\n成年人的世界，连崩溃都要悄悄进行。\n\n但我想说：你很好，真的很好。',
+ '妈妈问我最近过得好不好。\n\n我盯着屏幕很久，打了又删，删了又打。\n\n{F}，最终还是没发出去。\n\n怕她担心，更怕自己哭出来。\n\n愿你也被温柔以待，愿你也被好好爱着。',
+ '有人说，越长大越不容易动情。\n\n可{F}，我还是红了眼眶。\n\n原来不是我们变冷漠了，\n而是我们学会了把情绪藏起来。\n\n今天的你，辛苦了。',
+ '凌晨三点，我删掉了和他的聊天记录。\n\n{F}，像一根刺卡在喉咙。\n\n原来告别，从来不需要一句“再见”。\n\n时间会治愈一切，你也是。',
+ '你有多久没有好好吃一顿早餐了？\n\n{F}，让我突然很想家。\n\n所谓长大，不过是从被照顾，\n变成照顾别人的过程。\n\n别忘了，也要照顾好自己。',
+ '翻手机相册，翻到一张老照片。\n\n{F}，原来已经过去这么久了。\n\n时间不声不响，把我们都变成了大人。\n\n愿你历经山河，仍觉得人间值得。',
+ '最近特别累，身心俱疲。\n\n{F}，是我唯一的慰藉。\n\n人这一生，就是在一次次崩溃中自愈。\n\n再坚持一下，光就在前面。'
+ ],
+ '人生感悟':[
+ '曾以为人生是加法，拥有得越多越好。\n\n后来才明白，人生其实是减法。\n\n{F}，才是最难得的清醒。\n\n删繁就简，才能活出真实的自己。',
+ '你有没有发现，{F}？\n\n这不是矫情，而是成长必经的答案。\n\n人生下半场，拼的早已不是速度，\n而是心态和看开的能力。\n\n愿你历尽千帆，归来仍是少年。',
+ '小时候总想快点长大，长大才发现：\n{F}。\n\n有些道理，非要摔过跟头才懂。\n\n没关系，走过的弯路，都是通往答案的路。',
+ '最近和一个老朋友聊天，\n他感叹：{F}。\n\n我深以为然。\n\n人生最难得的，不是拥有多少，\n而是看清自己真正想要什么。',
+ '把日子过好，比什么都重要。\n\n{F}，是我这几年最大的感悟。\n\n不再焦虑，不再攀比，\n把注意力还给生活本身。\n\n简单，即富足。',
+ '年轻时总想把生活填满，\n现在才懂，{F}。\n\n留白，也是一种圆满。\n\n给自己一点独处的时间，\n给心灵留一点呼吸的空间。',
+ '有人问我，人到中年最怕什么？\n\n我想了想：不是变老，而是{F}。\n\n与其纠结过往，不如专注当下。\n\n你唯一能把握的，就是现在。',
+ '今天读到一句话，很触动：\n“人生最好的状态，是{F}。”\n\n与其向外求认可，不如向内求安宁。\n\n心若安定，万事从容。'
+ ],
+ '智慧人生':[
+ '真正的高人，从不炫耀自己的聪明。\n\n{F}，才是处世的大智慧。\n\n把姿态放低，把格局打开，\n人生自然顺风顺水。',
+ '有句话说得好：\n“你改变不了风的方向，但可以调整风帆。”\n\n{F}，就是一种调整风帆的智慧。\n\n遇事不慌，逢山开路，遇水架桥。',
+ '和谁相处最累？和三观不合的人。\n\n真正聪明的人，早已学会{F}。\n\n与其在烂人身上消耗自己，\n不如把时间留给值得的人和事。',
+ '同样是忙，有人忙出价值，有人忙出焦虑。\n\n区别就在于是否懂得{F}。\n\n聪明地努力，好过盲目地拼命。\n\n方向对了，每一步都算数。',
+ '老祖宗留下的智慧，越品越有味道：\n“大智若愚，大巧若拙。”\n\n{F}，看似吃亏，实则是福。\n\n懂得让一步，天地自然宽。',
+ '人到一定岁数，要懂得给人生做减法。\n\n{F}，就是最好的减负。\n\n减掉无效社交，减掉无谓执念，\n减掉消耗你的人。\n\n轻装上阵，才能走得更远。',
+ '会做事的人很多，会做人才是真本事。\n\n{F}，是情商的最高体现。\n\n留三分余地给别人，\n也留七分余地给自己。',
+ '年轻时以为拼命就是智慧，\n后来才明白，{F}才是。\n\n懂得权衡，懂得取舍，\n懂得在适当的时候停下来。\n\n这才是掌控人生的能力。'
+ ],
+ '女性成长':[
+ '很多女孩子把全部力气用来爱别人，\n却忘了先爱自己。\n\n{F}，是我最想告诉你的道理。\n\n当你开始爱自己，全世界都会来爱你。',
+ '收到一位姐妹的私信，她说：\n“我开始{F}，感觉整个人都轻松了。”\n\n真好，这才是女性该有的成长。\n\n不被定义，不被绑架，\n活成自己喜欢的样子。',
+ '女孩子记住：\n你的价值，从来不靠别人的认可来证明。\n\n{F}，就是最好的开始。\n\n经济独立，精神独立，\n内心才能真正强大。',
+ '昨天和一个30岁的姐妹吃饭，\n她笑着说：“我终于学会{F}了。”\n\n那一刻我觉得她整个人都在发光。\n\n成长，就是一点点把自己还给自己。',
+ '女生最顶级的活法是什么？\n大概是：精致，但不攀比；\n温柔，但有底线；\n独立，但依然相信爱。\n\n{F}，你就赢了一大半。',
+ '写给每一个正在努力的女孩：\n{F}，你已经很棒了。\n\n不必活成别人眼里的样子，\n你只管发光，花会自己盛开。',
+ '成长的代价，是丢掉一部分天真。\n但值得。\n\n{F}，是女人最飒的清醒。\n\n愿你既有铠甲，也有软肋；\n既能独当一面，也能被好好宠爱。',
+ '不要再把自己困在别人的期待里。\n\n{F}，就是你要勇敢迈出的第一步。\n\n你的人生，轮不到别人来打分。'
+ ]
+};
+
+const TAG_POOL = {
+ '情感共鸣':['情感共鸣','扎心','治愈','亲情','母爱','失恋','孤独','深夜','成年人','温暖'],
+ '人生感悟':['人生感悟','通透','断舍离','中年','心态','独处','放下','领悟','生活','清醒'],
+ '智慧人生':['智慧人生','格局','处世','人际','情商','取舍','减法','国学','心态','清醒'],
+ '女性成长':['女性成长','爱自己','独立','成熟','蜕变','清醒','勇气','自信','女人','强大']
+};
+
+const HOOK_POOL = {
+ '情感共鸣':['场景细节拉满，评论区秒变树洞','第一人称叙事，代入感极强','细节共鸣引发全网刷屏','结尾金句收尾，点赞率飙升','深夜情绪场景，女性用户高传播'],
+ '人生感悟':['观点型文案，收藏转发双高','“到了一定年纪”开头锁定中青年','金句收尾适合做语录卡传播','清单式结构，评论区互动高','扎心洞察+正向收尾，转化率高'],
+ '智慧人生':['处世智慧+名人金句，中青年疯传','“真正聪明的人”猎奇标题高点击','引用国学金句，长辈用户爱转发','方法论清单，职场人高收藏','格局类观点，高净值人群点赞'],
+ '女性成长':['“姐妹”口吻亲切，女性高共鸣','清单体+收藏引导，收藏率之王','励志观点直击痛点，点赞飙升','故事+金句结构，转发达人','独立话题敏感，评论区爆聊']
+};
+
+/* 统计口径：单条点赞/评论/收藏范围（万） */
+const STAT_RANGE = {
+ '情感共鸣':[30,260,2,15,3,20],
+ '人生感悟':[40,220,1.5,10,5,30],
+ '智慧人生':[35,190,1,8,4,28],
+ '女性成长':[30,200,2,14,5,28]
+};
+
+function dayKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function hashStr(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+function mulberry(seed){ let a=seed>>>0; return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function pick(r, arr){ return arr[Math.floor(r()*arr.length)]; }
+function idxShift(r, len){ return Math.floor(r()*len); }
+
+const AUTHORS_BY_PLAT = {dy:[],xhs:[],sp:[]};
+AUTHOR_POOL.forEach(a=>AUTHORS_BY_PLAT[a[4]].push(a));
+
+let DEMO = [];
+let DAILY_META = {date:dayKey(new Date()), count:0, seed:''};
+
+function buildDaily(seed){
+  seed = seed || dayKey(new Date());
+  const r = mulberry(hashStr(seed));
+  const list = [];
+  const usedTitles = new Set();
+  let guard = 0;
+
+  for(let i=0;i<ITEM_COUNT;i++){
+    const platform = PLATFORMS[Math.floor(r()*3)];
+    const cat = CAT_LIST[Math.floor(r()*4)];
+    const F = FILLER[cat];
+    const f0 = idxShift(r, F.length);
+    let f = F[f0];
+    let title = pick(r, TITLE_T[cat]).replace('{F}', f);
+
+    let tries = 0;
+    while(usedTitles.has(title) && tries<20){
+      f = F[(f0 + ++tries) % F.length];
+      title = pick(r, TITLE_T[cat]).replace('{F}', f);
+    }
+    usedTitles.add(title);
+
+    const content = pick(r, CONTENT_T[cat]).replace('{F}', f) + '\n\n#' + TAG_POOL[cat].join(' #');
+    const tags = [cat].concat(shuffleCopy(r, TAG_POOL[cat].slice(1)).slice(0,3));
+
+    const au = pick(r, AUTHORS_BY_PLAT[platform]);
+    const sr = STAT_RANGE[cat];
+    const likes  = Math.round(sr[0] + (sr[1]-sr[0]) * r()) * 10000;
+    const comments = Math.round(sr[2] + (sr[3]-sr[2]) * r()) * 10000;
+    const collects = Math.round(sr[4] + (sr[5]-sr[4]) * r()) * 10000;
+
+    list.push({
+      id: i+1, cat, platform,
+      title, content, tags,
+      date: dayKey(new Date()),
+      likes, comments, collects,
+      hook: pick(r, HOOK_POOL[cat]),
+      author: {
+        name: au[0], avatar: au[1],
+        color: 'linear-gradient(135deg,#'+au[2]+',#'+au[3]+')',
+        platform: au[4],
+        fans: Math.round(au[5] + (au[6]-au[5])*r()),
+        likes: Math.round(au[7]*(0.6+r()*0.8)),
+        works: Math.round(au[8]*(0.9+r()*0.2)),
+        bio: au[9], verified: !!au[10]
+      }
+    });
+  }
+  DAILY_META = {date: dayKey(new Date()), count: list.length, seed};
+  return list;
+}
+function shuffleCopy(r, arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(r()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+DEMO = buildDaily();
+
+const PLATFORM_META = {
+  dy:  {label:'抖音',  cls:'dy',  color:'#1a1a1a'},
+  xhs: {label:'小红书',cls:'xhs', color:'#ff2442'},
+  sp:  {label:'视频号',cls:'sp',  color:'#07c160'}
+};
+const HOT_KEYWORDS = ['情感共鸣','人生感悟','智慧人生','女性成长','扎心','治愈','婚姻','父母','经济独立','爱自己'];
+
+/* ---------- 本地状态 ---------- */
+const KEY = 'vch_state';
+let state = {
+  kv:{},            // keyword -> {time, count}
+  favs:[],          // 好文收藏（存完整快照，不受每日换新影响）
+  likes:[],
+  views:[],         // 浏览足迹 [ids]
+  follows:[]        // 关注的博主
+};
+let ui = { kw:'', platform:'all', sort:'hot', page:'home', kwList:[] };
+
+/* ---------- 好文收藏：快照与身份 ---------- */
+function ukeyOf(d){ return (DAILY_META.seed||'seed')+'_'+d.id; }
+function getFavByUkey(ukey){ return state.favs.find(f=>f.ukey===ukey); }
+function isSavedId(d){ return state.favs.some(f=>f.ukey===ukeyOf(d)); }
+function snapshotOf(d){
+  return {
+    ukey: ukeyOf(d),
+    id: d.id, cat: d.cat, platform: d.platform,
+    title: d.title, content: d.content, tags: (d.tags||[]).slice(),
+    author: {name:d.author.name, avatar:d.author.avatar, fans:d.author.fans, bio:d.author.bio},
+    savedAt: Date.now(), edited:false
+  };
+}
+function fmtTime(t){
+  const d = new Date(t);
+  const p = n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function copyText(text, okMsg){
+  const done = ()=>toast(okMsg||'✅ 已复制到剪贴板');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>{ legacyCopy(text); done(); });
+  } else { legacyCopy(text); done(); }
+}
+function legacyCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+}
+
+function loadState(){
+  try{ const s = localStorage.getItem(KEY); if(s) Object.assign(state, JSON.parse(s)); }catch(e){}
+  if(!Array.isArray(state.favs)) state.favs=[];
+  if(!Array.isArray(state.likes)) state.likes=[];
+  if(!Array.isArray(state.views)) state.views=[];
+  if(!Array.isArray(state.follows)) state.follows=[];
+  state.kv = state.kv||{};
+  // 兼容旧版：数字收藏 -> 转为快照
+  state.favs = state.favs.map(x=>{
+    if(typeof x==='number' || (typeof x==='string' && /^\d+$/.test(x))){
+      const d = DEMO.find(t=>t.id===Number(x));
+      return d ? snapshotOf(d) : null;
+    }
+    return x;
+  }).filter(Boolean);
+  state.favs.forEach(f=>{ if(f && typeof f==='object'){ f.savedAt=f.savedAt||Date.now(); f.edited=!!f.edited; } });
+}
+function saveState(){
+  try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
+}
+function fmt(n){
+  if(n>=100000000) return (n/100000000).toFixed(1).replace(/\.0$/,'')+'亿';
+  if(n>=10000) return (n/10000).toFixed(1).replace(/\.0$/,'')+'万';
+  return n+'';
+}
+
+/* ---------- 搜索与过滤 ---------- */
+function getPlatform(){
+  if(ui.platform==='all') return [...DEMO];
+  return DEMO.filter(d=>d.platform===ui.platform);
+}
+function score(d){
+  // 综合热度: 点赞权重最高，评论/收藏辅助
+  return d.likes*1 + d.comments*6 + d.collects*2;
+}
+function filterList(){
+  let list = getPlatform();
+  const q = ui.kw.trim().toLowerCase();
+  if(q){
+    list = list.filter(d=>
+      d.title.toLowerCase().includes(q) ||
+      d.content.toLowerCase().includes(q) ||
+      d.author.name.toLowerCase().includes(q) ||
+      (d.tags||[]).some(t=>t.toLowerCase().includes(q))
+    );
+  }
+  switch(ui.sort){
+    case 'hot':   list.sort((a,b)=>score(b)-score(a)); break;
+    case 'likes': list.sort((a,b)=>b.likes-a.likes); break;
+    case 'scoreDesc': list.sort((a,b)=>scoreOf(b)-scoreOf(a)); break;
+    case 'scoreAsc': list.sort((a,b)=>scoreOf(a)-scoreOf(b)); break;
+    case 'new':   list.sort((a,b)=>b.date.localeCompare(a.date)); break;
+  }
+  return list;
+}
+function scoreOf(d){ return Math.min(100, Math.max(5, Math.round(score(d)/40000))); }
+
+/* ---------- 渲染：卡片 ---------- */
+const CAT_META = { '情感共鸣':0, '人生感悟':1, '智慧人生':2, '女性成长':3 };
+const CAT_ICON = ['💗','🕯','🌿','🌸'];
+function catChipHTML(d){
+  const idx = CAT_META[d.cat];
+  return `<span class="catchip c${idx}">${CAT_ICON[idx]} ${d.cat}</span>`;
+}
+function badgeHTML(d){
+  const p = PLATFORM_META[d.platform];
+  const icon = d.platform==='dy'?'<svg viewBox="0 0 24 24"><path d="M9.6 9.5l-.4 2h3v8h2.6a.3.3 0 00.3-.3V11.5h2.8l.4-2h-3.2V7.8c0-.6.5-1 1.1-1h2.1V4.8h-2.4c-2.2 0-3.6 1.6-3.6 3.9v.8H9.6z"/></svg>'
+    : d.platform==='xhs'?'<svg viewBox="0 0 24 24"><path d="M7 2.5h10a4.5 4.5 0 014.5 4.5v10A4.5 4.5 0 0117 21.5H7A4.5 4.5 0 012.5 17V7A4.5 4.5 0 017 2.5zm2.8 5.2a.9.9 0 00-.9.9v6.8a.9.9 0 00.9.9h6.8a.9.9 0 00.9-.9V8.6a.9.9 0 00-.9-.9h-6.8z"/></svg>'
+    : '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 2a8 8 0 110 16 8 8 0 010-16zm-4 5h8v2H8V9zm0 4h8v2H8v-2z"/></svg>';
+  return `<span class="badge ${p.cls}">${icon}${p.label}</span>`;
+}
+function scoreChipHTML(d){
+  const s = scoreOf(d);
+  return `<span class="scorechip">🔥 评分 <b>${s}</b></span>`;
+}
+function cardHTML(d, opts){
+  opts = opts||{};
+  const p = PLATFORM_META[d.platform];
+  const isLiked = state.likes.includes(d.id);
+  const isSaved = isSavedId(d);
+  const isFollowing = state.follows.includes(d.author.name);
+  const tags = d.tags.map(t=>`<span class="tag">#${t}</span>`).join('');
+  return `
+  <div class="card" onclick="openDetail(${d.id})">
+    ${badgeHTML(d)}${catChipHTML(d)}${scoreChipHTML(d)}
+    <div class="title">${d.title}</div>
+    <div class="excerpt">${d.content.split('\n')[0]}</div>
+    ${tags?`<div class="tags">${tags}</div>`:''}
+    <div class="author" onclick="event.stopPropagation();openBlogger(${d.id})">
+      <div class="avatar" style="background:${d.author.color}">${d.author.avatar}</div>
+      <div class="info">
+        <div class="name">${d.author.name}${d.author.verified?'<em class="v">大V</em>':''}</div>
+        <div class="fans">👤 ${fmt(d.author.fans)} 粉丝</div>
+      </div>
+      <button class="followbtn ${isFollowing?'following':''}" onclick="event.stopPropagation();toggleFollow('${d.author.name}')">${isFollowing?'已关注':'+ 关注'}</button>
+    </div>
+    <div class="stats">
+      <div class="stat">❤️ <b>${fmt(d.likes)}</b></div>
+      <div class="stat">💬 <b>${fmt(d.comments)}</b></div>
+      <div class="stat">⭐ <b>${fmt(d.collects)}</b></div>
+      <div class="stat">📅 <b>${d.date}</b></div>
+    </div>
+    <div class="actions">
+      <div class="act ${isLiked?'liked':''}" onclick="event.stopPropagation();toggleLike(${d.id})">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="${isLiked?'#ff5a5f':'none'}" stroke="${isLiked?'#ff5a5f':'#9aa1ad'}" stroke-width="2"><path d="M12 21s-7-4.5-9.5-9C.5 8 3 4 7 4c2.5 0 4 1.5 5 3 1-1.5 2.5-3 5-3 4 0 6.5 4 4.5 8-2.5 4.5-9.5 9-9.5 9z"/></svg>
+        ${isLiked?'已点赞':'点赞'}
+      </div>
+      <div class="act ${isSaved?'saved':''}" onclick="event.stopPropagation();toggleFav(${d.id})">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="${isSaved?'#f5a623':'none'}" stroke="${isSaved?'#f5a623':'#9aa1ad'}" stroke-width="2"><path d="M5 3h14v18l-7-4.5L5 21V3z"/></svg>
+        ${isSaved?'已收藏':'收藏'}
+      </div>
+      <div class="act" onclick="event.stopPropagation();copyContent(${d.id})">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa1ad" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
+        复制文案
+      </div>
+      <div class="act" onclick="event.stopPropagation();openDetail(${d.id})">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa1ad" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        详情
+      </div>
+    </div>
+  </div>`;
+}
+function renderList(){
+  const list = filterList();
+  document.getElementById('list').innerHTML = list.length
+    ? list.map(cardHTML).join('')
+    : `<div class="empty"><div class="big">🔍</div>没有找到相关爆款文案<br>换个关键词试试～</div>`;
+  const total = getPlatform().length;
+  document.getElementById('countlabel').textContent = `共 ${list.length} / ${total} 条`;
+  document.getElementById('dailybar').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,#fff5f2,#fff1f6);border:1px solid #ffe4d9;border-radius:14px;padding:10px 14px;margin:0 2px 12px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700">📅 今日已更新 <b style="color:var(--brand)">${DAILY_META.count}</b> 条爆款文案</div>
+        <div style="font-size:11px;color:var(--ink-3);margin-top:2px">数据更新于 ${DAILY_META.date} · 每天自动换新</div>
+      </div>
+      <button onclick="refreshDaily()" style="flex:none;font-size:12px;font-weight:700;background:linear-gradient(135deg,var(--brand),var(--brand-g));color:#fff;border:none;border-radius:99px;padding:8px 14px;cursor:pointer">🔄 换一批</button>
+    </div>`;
+}
+function refreshDaily(){
+  const seed = Date.now();
+  DEMO = buildDaily(seed);
+  loadState(); renderAll();
+  toast('🔄 已重新生成 ' + DAILY_META.count + ' 条今日内容');
+}
+function renderHotKw(){
+  document.getElementById('hotkw').innerHTML = HOT_KEYWORDS.map(k=>`<span onclick="ui.kw='${k}';document.getElementById('kw').value='${k}';doSearch()">${k}</span>`).join('');
+}
+
+/* ---------- 平台/排序切换 ---------- */
+function renderChips(){
+  const defs = [
+    {v:'all',label:'全部'},
+    {v:'dy',label:'抖音'},
+    {v:'xhs',label:'小红书'},
+    {v:'sp',label:'视频号'}
+  ];
+  document.getElementById('platformChips').innerHTML = defs.map(c=>{
+    const n = c.v==='all'?DEMO.length:DEMO.filter(d=>d.platform===c.v).length;
+    return `<span class="chip ${ui.platform===c.v?'active':''}" onclick="ui.platform='${c.v}';renderChips();renderList()">${c.label}<span class="count">${n}</span></span>`;
+  }).join('');
+  const sorts = [
+    {v:'hot',label:'综合热度',icon:'🔥'},
+    {v:'likes',label:'点赞最多',icon:'❤️'},
+    {v:'scoreDesc',label:'评分最高',icon:'📊'},
+    {v:'scoreAsc',label:'评分最低',icon:'📉'},
+    {v:'new',label:'最新发布',icon:'🕐'}
+  ];
+  document.getElementById('sortbar').innerHTML = sorts.map(s=>
+    `<span class="sort ${ui.sort===s.v?'active':''}" onclick="ui.sort='${s.v}';renderList()">${s.icon} ${s.label}</span>`
+  ).join('') + `<span class="countlabel" id="countlabel"></span>`;
+}
+
+/* ---------- 搜索 ---------- */
+function doSearch(){
+  const kw = document.getElementById('kw').value;
+  ui.kw = kw;
+  if(kw.trim()){
+    state.kv[kw.trim()] = {time:Date.now(), count:(state.kv[kw.trim()]?.count||0)+1};
+    saveState();
+  }
+  document.getElementById('kwClear').classList.toggle('show', !!kw);
+  switchPage('home');
+  renderList();
+  if(!kw) toast('请输入搜索关键词');
+}
+document.getElementById('kw').addEventListener('input', e=>{
+  document.getElementById('kwClear').classList.toggle('show', !!e.target.value);
+});
+document.getElementById('kwClear').onclick = ()=>{ document.getElementById('kw').value=''; ui.kw=''; document.getElementById('kwClear').classList.remove('show'); renderList(); };
+document.getElementById('kw').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
+
+/* ---------- 详情弹层 ---------- */
+function openDetail(id){
+  const d = DEMO.find(x=>x.id===id); if(!d) return;
+  if(!state.views.includes(id)){ state.views.push(id); if(state.views.length>60) state.views.shift(); saveState(); }
+  const isLiked = state.likes.includes(id), isSaved = isSavedId(d);
+  const p = PLATFORM_META[d.platform];
+  const scoreV = scoreOf(d);
+  document.getElementById('sheetBody').innerHTML = `
+    <div class="handle"></div><div class="close" onclick="closeSheet()">完成</div>
+    <div class="detail">
+      ${badgeHTML(d)}${catChipHTML(d)}
+      <div class="plink" style="margin-top:8px">📌 博主：<b>${d.author.name}</b> · 粉丝 ${fmt(d.author.fans)} · 发布于 ${d.date}</div>
+      <div class="dtitle">${d.title}</div>
+      <div class="copybox">
+        <div class="ctitle">📝 完整文案</div>${d.content}
+      </div>
+      <button class="copybtn" onclick="copyContent(${d.id})">📋 一键复制完整文案</button>
+      <div class="hookline">提示：${d.hook}</div>
+
+      <div class="scorewrap">
+        <div class="scorehead"><span>🔥 爆款潜力评估</span><b>${scoreV} 分</b></div>
+        <div class="scorebar"><i style="width:${scoreV}%"></i></div>
+        <div class="scoreitems">
+          <div class="scoreitem"><b>${fmt(d.likes)}</b>点赞</div>
+          <div class="scoreitem"><b>${fmt(d.comments)}</b>评论</div>
+          <div class="scoreitem"><b>${fmt(d.collects)}</b>收藏</div>
+          <div class="scoreitem"><b>${fmt(d.author.fans)}</b>粉丝</div>
+        </div>
+      </div>
+
+      <div class="secline">
+        ${d.tags.map(t=>`<span class="sec">#${t}</span>`).join('')}
+      </div>
+
+      <div class="author" style="border-top:1px solid var(--line);border-radius:14px;background:#fafbfd;margin:0 0 6px" onclick="openBlogger(${d.id})">
+        <div class="avatar" style="background:${d.author.color}">${d.author.avatar}</div>
+        <div class="info">
+          <div class="name">${d.author.name}${d.author.verified?'<em class="v">大V</em>':''}</div>
+          <div class="fans">${d.author.bio}</div>
+        </div>
+        <span style="color:var(--brand);font-size:12px">查看博主 ›</span>
+      </div>
+
+      <div class="actions" style="border:1px solid var(--line);border-radius:14px;overflow:hidden">
+        <div class="act ${isLiked?'liked':''}" onclick="toggleLike(${d.id});openDetail(${d.id})">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="${isLiked?'#ff5a5f':'none'}" stroke="${isLiked?'#ff5a5f':'#9aa1ad'}" stroke-width="2"><path d="M12 21s-7-4.5-9.5-9C.5 8 3 4 7 4c2.5 0 4 1.5 5 3 1-1.5 2.5-3 5-3 4 0 6.5 4 4.5 8-2.5 4.5-9.5 9-9.5 9z"/></svg>
+          ${isLiked?'已点赞':'点赞'}
+        </div>
+        <div class="act ${isSaved?'saved':''}" onclick="toggleFav(${d.id});openDetail(${d.id})">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="${isSaved?'#f5a623':'none'}" stroke="${isSaved?'#f5a623':'#9aa1ad'}" stroke-width="2"><path d="M5 3h14v18l-7-4.5L5 21V3z"/></svg>
+          ${isSaved?'已收藏':'收藏'}
+        </div>
+      </div>
+
+      <div class="relatedhead">🎯 同博主热门内容</div>
+      ${relatedHTML(d)}
+    </div>`;
+  document.getElementById('sheet').classList.add('show');
+  document.getElementById('sheetBody').scrollTop = 0;
+}
+function relatedHTML(d){
+  const rel = DEMO.filter(x=>x.id!==d.id && (x.author.name===d.author.name || x.tags.some(t=>d.tags.includes(t)))).slice(0,3);
+  if(!rel.length) return `<div class="empty" style="padding:20px">暂无相关内容</div>`;
+  return rel.map(x=>`
+    <div class="card" style="margin-bottom:10px;box-shadow:none;border:1px solid var(--line)" onclick="openDetail(${x.id})">
+      <div class="title" style="font-size:14px;padding-top:12px">${x.title}</div>
+      <div class="stats" style="border-top:1px solid var(--line)">
+        <div class="stat">❤️ <b>${fmt(x.likes)}</b></div>
+        <div class="stat">💬 <b>${fmt(x.comments)}</b></div>
+        <div class="stat">⭐ <b>${fmt(x.collects)}</b></div>
+      </div>
+    </div>`).join('');
+}
+function closeSheet(){ document.getElementById('sheet').classList.remove('show'); }
+
+/* ---------- 博主主页 ---------- */
+function openBlogger(id){
+  const d = DEMO.find(x=>x.id===id); if(!d) return;
+  const a = d.author;
+  const works = DEMO.filter(x=>x.author.name===a.name);
+  const isFollowing = state.follows.includes(a.name);
+  const rank = DEMO.filter(x=>x.author.fans>a.fans).length+1;
+  document.getElementById('sheetBody').innerHTML = `
+    <div class="handle"></div><div class="close" onclick="closeSheet()">完成</div>
+    <div class="profile">
+      <div class="cover"></div>
+      <div class="avatarbig" style="background:${a.color}">${a.avatar}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <h2>${a.name}${a.verified?'<em class="v">大V</em>':''}</h2>
+        <button class="followbtn ${isFollowing?'following':''}" onclick="toggleFollow('${a.name}')">${isFollowing?'已关注':'+ 关注'}</button>
+      </div>
+      <div class="bio">${a.bio}</div>
+      <div class="fansgrid">
+        <div class="cell"><b>${fmt(a.fans)}</b><span>粉丝</span></div>
+        <div class="cell"><b>${fmt(a.likes)}</b><span>获赞</span></div>
+        <div class="cell"><b>${fmt(a.works)}</b><span>作品</span></div>
+        <div class="cell"><b>#${rank}</b><span>榜单排名</span></div>
+      </div>
+      <div class="recenthead">
+        ${works.length>1?'🔥 该博主的爆款文案':'📝 博主资料'}
+        <span class="more">${PLATFORM_META[d.platform].label}创作者</span>
+      </div>
+      ${works.length>1? works.map(cardHTML).join('') : `
+        <div class="copybox" style="margin-top:8px">平台：${PLATFORM_META[d.platform].label}
+主要领域：${d.tags.slice(0,3).join(' / ')}
+简介：${a.bio}</div>`}
+    </div>`;
+  document.getElementById('sheet').classList.add('show');
+  document.getElementById('sheetBody').scrollTop = 0;
+}
+
+/* ---------- 交互动作 ---------- */
+function toggleLike(id){
+  const i = state.likes.indexOf(id);
+  i>=0 ? state.likes.splice(i,1) : state.likes.push(id);
+  saveState(); renderList(); toast(i>=0?'已取消点赞':'❤️ 点赞成功');
+}
+function toggleFav(id){
+  const d = DEMO.find(x=>x.id===id); if(!d) return;
+  const uk = ukeyOf(d);
+  const i = state.favs.findIndex(f=>f.ukey===uk);
+  if(i>=0){
+    state.favs.splice(i,1);
+    saveState(); renderList(); renderMineStats(); toast('已取消收藏');
+  } else {
+    state.favs.unshift(snapshotOf(d));
+    saveState(); renderList(); renderMineStats();
+    toast('⭐ 已存入「我的好文」，可随时查看和修改');
+  }
+  if(ui.page==='save') renderFav();
+}
+function toggleFollow(name){
+  const i = state.follows.indexOf(name);
+  i>=0 ? state.follows.splice(i,1) : state.follows.push(name);
+  saveState(); toast(i>=0?'已取消关注':'✅ 关注成功');
+  if(ui.page==='find') renderRank();
+  if(document.getElementById('sheet').classList.contains('show')) refreshSheet();
+}
+function copyContent(id){
+  const d = DEMO.find(x=>x.id===id); if(!d) return;
+  const text = `【${PLATFORM_META[d.platform].label}爆款】${d.title}\n\n${d.content}\n\n——来自 ${d.author.name} (粉丝${fmt(d.author.fans)})`;
+  copyText(text, '✅ 文案已复制到剪贴板');
+}
+function refreshSheet(){
+  // 关注状态变化后重渲染当前弹层
+  const body = document.getElementById('sheetBody');
+  const t = body.innerText;
+  if(t.includes('博主资料') || t.includes('榜单排名')){ /* 博主页重开需原id */ }
+}
+
+/* ---------- 我的好文：查看 / 编辑 / 删除 / 导出 ---------- */
+function favCardHTML(f){
+  const tags = (f.tags||[]).slice(0,3).map(t=>`<span class="tag">#${t}</span>`).join('');
+  return `
+  <div class="card" onclick="openFavDetail('${f.ukey}')">
+    ${badgeHTML(f)}${catChipHTML(f)}
+    <div class="title">${esc(f.title)}</div>
+    <div class="excerpt">${esc(String(f.content).split('\n')[0])}</div>
+    <div class="favmeta">
+      <span class="tag">📌 收藏于 ${fmtTime(f.savedAt)}</span>
+      <span class="tag">${f.edited?'✍️ 已修改':'📝 原文'}</span>
+    </div>
+    <div class="actions">
+      <div class="act" onclick="event.stopPropagation();openFavDetail('${f.ukey}')">👁 查看</div>
+      <div class="act" onclick="event.stopPropagation();openEditor('${f.ukey}')">✏️ 编辑</div>
+      <div class="act" onclick="event.stopPropagation();copyFav('${f.ukey}')">📋 复制</div>
+      <div class="act" onclick="event.stopPropagation();delFav('${f.ukey}')">🗑 删除</div>
+    </div>
+  </div>`;
+}
+function renderFav(){
+  const list = state.favs.slice();
+  let html = '';
+  if(list.length){
+    html += `<div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="exportbtn" onclick="exportFavs()">📤 导出全部好文</button>
+      </div>` + list.map(favCardHTML).join('');
+  } else {
+    const rec = [...DEMO].sort((a,b)=>score(b)-score(a)).slice(0,4);
+    html += `<div class="empty"><div class="big">📖</div>还没有收藏好文<br>点卡片上的「收藏」即可保存到这里</div>`;
+    html += `<div class="recenthead" style="margin:4px 2px 10px">🔥 热门精选 · 收藏后出现在上方</div>`;
+    html += rec.map(recCardHTML).join('');
+  }
+  document.getElementById('favlist').innerHTML = html;
+  renderMineStats();
+}
+function recCardHTML(d){
+  return `
+  <div class="card" onclick="openDetail(${d.id})">
+    ${badgeHTML(d)}${catChipHTML(d)}${scoreChipHTML(d)}
+    <div class="title" style="font-size:14px">${d.title}</div>
+    <div class="stats" style="border-top:1px solid var(--line)">
+      <div class="stat">❤️ <b>${fmt(d.likes)}</b></div>
+      <div class="stat">💬 <b>${fmt(d.comments)}</b></div>
+      <div class="stat">⭐ <b>${fmt(d.collects)}</b></div>
+    </div>
+    <div class="actions" style="border-top:1px solid var(--line)">
+      <div class="act" style="color:var(--brand);font-weight:700" onclick="event.stopPropagation();toggleFav(${d.id});renderFav()">⭐ 收藏</div>
+      <div class="act" onclick="event.stopPropagation();openDetail(${d.id})">查看</div>
+    </div>
+  </div>`;
+}
+function openFavDetail(ukey){
+  const f = getFavByUkey(ukey); if(!f) return;
+  const p = PLATFORM_META[f.platform];
+  document.getElementById('sheetBody').innerHTML = `
+    <div class="handle"></div><div class="close" onclick="closeSheet()">完成</div>
+    <div class="detail">
+      ${badgeHTML(f)}${catChipHTML(f)}
+      <div class="plink" style="margin-top:8px">📌 ${p.label} · ${esc(f.author.name)} · 收藏于 ${fmtTime(f.savedAt)}${f.edited?' · ✍️ 已修改':''}</div>
+      <div class="dtitle">${esc(f.title)}</div>
+      <div class="copybox"><div class="ctitle">📝 好文全文</div>${esc(f.content)}</div>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="copybtn" style="flex:2" onclick="copyFav('${f.ukey}')">📋 复制全文</button>
+        <button class="copybtn" style="flex:1;background:linear-gradient(135deg,#6366f1,#8b5cf6)" onclick="openEditor('${f.ukey}')">✏️ 编辑</button>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <button class="copybtn" style="flex:1;background:linear-gradient(135deg,#f43f5e,#fb7185)" onclick="delFav('${f.ukey}')">🗑 删除</button>
+        <button class="copybtn" style="flex:1;background:#f1f2f5;color:var(--ink-2)" onclick="closeSheet()">返回</button>
+      </div>
+    </div>`;
+  document.getElementById('sheet').classList.add('show');
+  document.getElementById('sheetBody').scrollTop = 0;
+}
+function openEditor(ukey){
+  const f = getFavByUkey(ukey); if(!f) return;
+  document.getElementById('sheetBody').innerHTML = `
+    <div class="handle"></div><div class="close" onclick="closeSheet()">完成</div>
+    <div style="font-size:16px;font-weight:800;margin-bottom:12px">✏️ 编辑好文</div>
+    <div class="edlabel">标题</div>
+    <input class="edinput" id="edTitle" value="${esc(f.title)}" placeholder="请输入标题">
+    <div class="edlabel">文案内容</div>
+    <textarea class="edtextarea" id="edContent" placeholder="请输入完整文案">${esc(f.content)}</textarea>
+    <div style="display:flex;gap:10px;margin-top:14px">
+      <button class="copybtn" style="flex:2" onclick="saveEdit('${f.ukey}')">💾 保存修改</button>
+      <button class="copybtn" style="flex:1;background:#f1f2f5;color:var(--ink-2)" onclick="openFavDetail('${f.ukey}')">取消</button>
+    </div>`;
+  document.getElementById('sheet').classList.add('show');
+  document.getElementById('sheetBody').scrollTop = 0;
+  setTimeout(()=>{ const t=document.getElementById('edContent'); if(t){ t.focus(); const L=t.value.length; t.setSelectionRange(L,L); } }, 350);
+}
+function saveEdit(ukey){
+  const f = getFavByUkey(ukey); if(!f) return;
+  const t = document.getElementById('edTitle'), c = document.getElementById('edContent');
+  if(!t || !c) return;
+  if(!c.value.trim()){ toast('文案内容不能为空'); return; }
+  f.title = t.value.trim() || f.title;
+  f.content = c.value.trim();
+  f.edited = true;
+  saveState(); renderFav();
+  openFavDetail(ukey);
+  toast('✅ 好文已更新保存');
+}
+function delFav(ukey){
+  const f = getFavByUkey(ukey); if(!f) return;
+  if(!confirm('确定删除这篇收藏的好文吗？')) return;
+  const i = state.favs.findIndex(x=>x.ukey===ukey);
+  if(i>=0) state.favs.splice(i,1);
+  saveState(); renderFav(); renderList(); renderMineStats();
+  closeSheet(); toast('🗑 已删除');
+}
+function copyFav(ukey){
+  const f = getFavByUkey(ukey); if(!f) return;
+  const text = `【${PLATFORM_META[f.platform].label}好文】${f.title}\n\n${f.content}\n\n——来自 ${f.author.name}`;
+  copyText(text, '✅ 好文已复制到剪贴板');
+}
+function exportFavs(){
+  if(!state.favs.length){ toast('还没有收藏任何好文'); return; }
+  const parts = state.favs.map((f,i)=>
+    `【${i+1}】${f.title}\n（${PLATFORM_META[f.platform].label} · ${f.author.name} · 收藏于 ${fmtTime(f.savedAt)}${f.edited?' · 已修改':''}）\n\n${f.content}`
+  );
+  const blob = new Blob(['\ufeff'+parts.join('\n\n————————————\n\n')], {type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '我的好文收藏_'+DAILY_META.date+'.txt';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 600);
+  toast('📤 已导出 '+state.favs.length+' 篇好文');
+}
+
+/* ---------- 发现页 ---------- */
+function tagCount(){
+  const map = {};
+  DEMO.forEach(d=>d.tags.forEach(t=>map[t]=(map[t]||0)+1));
+  return Object.entries(map).sort((a,b)=>b[1]-a[1]);
+}
+function renderTopics(){
+  const tops = tagCount().slice(0,8).map(([t,n],i)=>{
+    const list = filterByTag(t);
+    return `<div class="card" onclick="openTopic('${t}')">
+      <div style="display:flex;align-items:center;gap:10px;padding:14px">
+        <div style="width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#ff5a5f,#ff8a5c);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px">${i+1}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:700"># ${t}</div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:3px">🔥 热度 ${n*10} · ${list.length} 条爆款文案</div>
+        </div>
+        <span style="font-size:12px;color:var(--ink-3)">›</span>
+      </div>
+      <div class="tags" style="padding:0 14px 12px;margin-top:-2px">
+        ${list.slice(0,3).map(x=>`<span class="tag">${PLATFORM_META[x.platform].label}</span>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('topics').innerHTML = tops;
+}
+function filterByTag(t){ return DEMO.filter(d=>d.tags.includes(t)); }
+function openTopic(t){
+  ui.kw = t; document.getElementById('kw').value = t;
+  document.getElementById('kwClear').classList.add('show');
+  switchPage('home'); renderList();
+}
+function renderRank(){
+  const list = [...DEMO].sort((a,b)=>b.author.fans-a.author.fans);
+  const seen = new Set();
+  const top = list.filter(d=>{ if(seen.has(d.author.name)) return false; seen.add(d.author.name); return true; }).slice(0,6);
+  document.getElementById('ranklist').innerHTML = top.map((d,i)=>`
+    <div class="card" onclick="openBlogger(${d.id})">
+      <div style="display:flex;align-items:center;gap:12px;padding:14px">
+        <div style="width:24px;text-align:center;font-weight:800;font-size:17px;color:${i<3?'#ff5a5f':'#c3c9d4'}">${i+1}</div>
+        <div class="avatar" style="background:${d.author.color}">${d.author.avatar}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:700">${d.author.name}${d.author.verified?'<em class="v" style="color:#fff;background:var(--brand);font-size:9px;padding:1px 4px;border-radius:4px;margin-left:4px">大V</em>':''}</div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:2px">${PLATFORM_META[d.platform].label} · ${d.author.bio.slice(0,20)}…</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:15px;font-weight:800;color:var(--brand)">${fmt(d.author.fans)}</div>
+          <div style="font-size:10px;color:var(--ink-3)">粉丝</div>
+        </div>
+      </div>
+      <div class="stats" style="border-top:1px solid var(--line)">
+        <div class="stat">获赞 <b>${fmt(d.author.likes)}</b></div>
+        <div class="stat">作品 <b>${fmt(d.author.works)}</b></div>
+        <div class="stat">👤 <b>${state.follows.includes(d.author.name)?'已关注':'可关注'}</b></div>
+      </div>
+    </div>`).join('');
+}
+
+function renderMineStats(){
+  document.getElementById('mFav').textContent = state.favs.length;
+  document.getElementById('mLike').textContent = state.likes.length;
+  document.getElementById('mHis').textContent = state.views.length;
+  const u = document.getElementById('mineUpdate');
+  if(u) u.textContent = '今日已更新 '+DAILY_META.count+' 条 · 已收藏 '+state.favs.length+' 篇好文 · 已关注 '+state.follows.length+' 位博主';
+}
+function clearData(){
+  if(!state.views.length){ toast('暂无浏览记录'); return; }
+  state.views=[]; saveState(); renderMineStats(); toast('🗑 浏览记录已清空');
+}
+function restoreDemo(){
+  if(confirm('确定要清空本地数据，重新生成演示内容吗？')){
+    state = {kv:{},favs:[],likes:[],views:[],follows:[]};
+    DEMO = buildDaily();
+    saveState(); renderAll(); toast('🔄 已恢复并重新生成今日内容');
+  }
+}
+
+/* ---------- 页面/底部导航 ---------- */
+function switchPage(name){
+  ui.page = name;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    const names=['home','find','save','mine'];
+    t.classList.toggle('active', names[i]===name);
+  });
+  window.scrollTo(0,0);
+  if(name==='find'){ renderTopics(); renderRank(); }
+  if(name==='save') renderFav();
+  if(name==='mine') renderMineStats();
+}
+
+/* ---------- 底部导航模板 ---------- */
+const TAB_BAR = `
+  <nav class="tabbar">
+    <div class="tab active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/></svg>
+      首页
+    </div>
+    <div class="tab">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      发现
+    </div>
+    <div class="tab">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h14v18l-7-4.5L5 21V3z"/></svg>
+      收藏
+    </div>
+    <div class="tab">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+      我的
+    </div>
+  </nav>`;
+
+/* ---------- toast ---------- */
+let toastTimer;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+/* ---------- 初始化 ---------- */
+function renderAll(){
+  renderHotKw(); renderChips(); renderList(); renderMineStats();
+}
+loadState();
+document.body.insertAdjacentHTML('beforeend', TAB_BAR);
+document.querySelectorAll('.tab').forEach((t,i)=>{
+  t.addEventListener('click', ()=>switchPage(['home','find','save','mine'][i]));
+});
+renderAll();
+// 支持“添加到主屏幕”后独立运行的细节
+if(navigator.vibrate){ /* 预留 */ }
+</script>
+</body>
+</html>
