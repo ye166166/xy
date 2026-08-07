@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>✿ 小甜简历 · SweetResume</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAF3E2;
+    --dot: #C2A688;
+    --card: #FFFDF6;
+    --ink: #6B5D4F;
+    --ink-soft: #9A8B7A;
+    --ink-faint: #BCAEA0;
+    --line: #EFE4D0;
+
+    --pink:  #E3B7B6;
+    --pink-soft:  #F6E7E4;
+    --purple:#C3B3D6;
+    --purple-soft:#EDE6F4;
+    --mint:  #B9CDBB;
+    --mint-soft:  #E8F0E8;
+    --yellow:#E6D8A6;
+    --yellow-soft:#F7F0DA;
+    --brown: #C2A688;
+    --brown-soft: #F1E6D6;
+
+    --shadow: 0 6px 0 rgba(196,168,130,.16), 0 16px 34px rgba(158,128,82,.12);
+    --bounce: cubic-bezier(.34,1.56,.64,1);
+    --ease:  cubic-bezier(.22,1,.36,1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    min-height: 100vh;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    color: var(--ink);
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(circle at 50% 50%, rgba(194,166,136,.16) 0, rgba(194,166,136,.16) 46px, transparent 48px),
+      radial-gradient(circle at 50% 50%, rgba(194,166,136,.13) 0, rgba(194,166,136,.13) 40px, transparent 42px),
+      radial-gradient(circle at 50% 50%, rgba(194,166,136,.10) 0, rgba(194,166,136,.10) 34px, transparent 36px);
+    background-size: 460px 460px, 620px 620px, 800px 800px;
+    background-attachment: fixed;
+    padding: 40px 20px 70px;
+    overflow-x: hidden;
+  }
+
+  .sheet {
+    max-width: 900px; margin: 0 auto;
+    background: var(--card);
+    border: 1.5px solid var(--line);
+    border-radius: 30px;
+    box-shadow: 0 8px 0 rgba(196,168,130,.18), 0 24px 60px rgba(158,128,82,.16);
+    overflow: hidden;
+    transition: transform .4s var(--bounce), box-shadow .4s var(--ease);
+  }
+  .sheet:hover { transform: translateY(-4px); box-shadow: 0 10px 0 rgba(196,168,130,.18), 0 32px 70px rgba(158,128,82,.2); }
+
+  /* 顶部 */
+  .head {
+    position: relative;
+    padding: 42px 46px 30px;
+    background: linear-gradient(150deg, var(--yellow-soft) 0%, var(--purple-soft) 55%, var(--pink-soft) 100%);
+    overflow: hidden;
+  }
+  .head::before {
+    content: ""; position: absolute; right: -60px; top: -60px;
+    width: 220px; height: 220px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(227,183,182,.4) 0, rgba(227,183,182,.15) 50%, transparent 70%);
+  }
+  .head::after {
+    content: "✦"; position: absolute; left: 18px; bottom: 12px;
+    font-size: 15px; color: rgba(194,166,136,.6);
+  }
+
+  .head-top { display: flex; align-items: flex-start; gap: 26px; position: relative; z-index: 1; }
+
+  .avatar {
+    width: 108px; height: 108px; flex: none; border-radius: 32px;
+    background: linear-gradient(140deg, var(--mint), var(--purple));
+    border: 4px solid #fffdf6;
+    box-shadow: 0 8px 0 rgba(196,168,130,.3), 0 14px 26px rgba(158,128,82,.18);
+    display: grid; place-items: center;
+    font-size: 46px;
+    transition: transform .4s var(--bounce);
+  }
+  .avatar:hover { transform: rotate(-6deg) scale(1.06); }
+
+  .id h1 {
+    font-family: "Ma Shan Zheng", "ZCOOL KuaiLe", cursive;
+    font-size: 44px; font-weight: 400; line-height: 1.2;
+    color: var(--ink);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .id .tagline {
+    display: inline-block;
+    font-size: 13px; font-weight: 600;
+    color: #7A6459;
+    background: #fffdf6;
+    border: 1.5px solid rgba(194,166,136,.5);
+    border-radius: 999px; padding: 5px 14px;
+    margin-top: 12px;
+  }
+  .id p.sub { font-size: 15px; color: var(--ink-soft); margin-top: 10px; }
+  .id p.sub b { color: var(--ink); font-weight: 700; }
+
+  .contact {
+    margin-top: 20px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: relative; z-index: 1;
+  }
+  .contact .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 13px; color: var(--ink);
+    background: #fffdf6;
+    border: 1.5px solid var(--line);
+    border-radius: 999px; padding: 8px 14px;
+    box-shadow: 0 4px 0 rgba(196,168,130,.16);
+    transition: transform .3s var(--bounce);
+  }
+  .contact .chip:hover { transform: translateY(-2px); }
+  .contact .chip.plain { background: transparent; border-style: dashed; border-color: var(--brown); box-shadow: none; }
+
+  /* 简介条 */
+  .intro-bar {
+    margin: 24px 46px 0; padding: 18px 22px;
+    background: var(--mint-soft);
+    border-radius: 20px;
+    border-left: 8px solid var(--mint);
+    font-size: 14.5px; line-height: 1.9;
+    color: #5F7562;
+    position: relative; z-index: 1;
+  }
+  .intro-bar b { color: #44624A; }
+
+  /* 主体 */
+  .body {
+    padding: 30px 46px 40px;
+    display: grid;
+    grid-template-columns: 1fr 1.35fr;
+    gap: 34px;
+  }
+
+  .sec { margin-bottom: 30px; }
+  .sec:last-child { margin-bottom: 0; }
+
+  .sec-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  .sec-head .badge {
+    width: 34px; height: 34px; border-radius: 12px; flex: none;
+    display: grid; place-items: center; font-size: 17px;
+    box-shadow: 0 4px 0 rgba(196,168,130,.22);
+  }
+  .sec-head h2 { font-size: 19px; font-weight: 700; color: var(--ink); }
+  .sec-head .sq {
+    flex: 1; height: 0; border-top: 2px dashed var(--line); margin-left: 6px;
+  }
+
+  /* 技能 */
+  .skill-row { margin-bottom: 14px; }
+  .skill-row .top { display: flex; justify-content: space-between; font-size: 13.5px; margin-bottom: 6px; }
+  .skill-row .top .lvl { color: var(--ink-faint); font-size: 12px; }
+  .bar { height: 11px; border-radius: 999px; background: var(--line); overflow: hidden; }
+  .bar i {
+    display: block; height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--mint), var(--purple));
+    width: 0; transition: width 1.1s var(--bounce);
+  }
+  .skill-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .skill-tags span {
+    font-size: 12.5px; color: #6B5A45;
+    background: var(--yellow-soft);
+    border-radius: 999px; padding: 6px 13px;
+    box-shadow: 0 3px 0 rgba(196,168,130,.14);
+  }
+
+  /* 教育 */
+  .edu { padding: 14px 16px; background: var(--card-soft, #FBF5E8); border-radius: 18px; margin-bottom: 10px; }
+  .edu .where { font-weight: 700; font-size: 15px; color: var(--ink); }
+  .edu .when { font-size: 12px; color: var(--ink-faint); margin-top: 3px; }
+  .edu .maj { font-size: 13px; color: var(--ink-soft); margin-top: 6px; }
+
+  /* 经历时间线 */
+  .timeline { position: relative; padding-left: 22px; }
+  .timeline::before {
+    content: ""; position: absolute; left: 4px; top: 6px; bottom: 6px;
+    border-left: 3px dashed var(--line);
+  }
+  .tl-item { position: relative; padding-bottom: 22px; }
+  .tl-item:last-child { padding-bottom: 0; }
+  .tl-item::before {
+    content: ""; position: absolute; left: -22px; top: 5px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: linear-gradient(140deg, var(--pink), var(--purple));
+    box-shadow: 0 0 0 4px #fffdf6, 0 0 0 6px var(--line);
+  }
+  .tl-item .when {
+    display: inline-block; font-size: 12px; color: #A9756B;
+    background: var(--pink-soft); border-radius: 999px; padding: 3px 11px;
+    margin-bottom: 6px; font-weight: 600;
+  }
+  .tl-item h3 { font-size: 15.5px; color: var(--ink); margin-bottom: 2px; }
+  .tl-item .org { font-size: 13px; color: var(--ink-soft); margin-bottom: 6px; }
+  .tl-item ul { list-style: none; }
+  .tl-item li {
+    position: relative; font-size: 13.5px; line-height: 1.7; color: #7A6A55;
+    padding-left: 18px; margin-top: 3px;
+  }
+  .tl-item li::before { content: "·"; position: absolute; left: 4px; color: var(--brown); font-weight: 700; }
+
+  /* 语言 */
+  .lang { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1.5px dashed var(--line); font-size: 14px; }
+  .lang:last-child { border-bottom: none; }
+  .lang .l { font-weight: 700; color: var(--ink); }
+  .lang .r { color: var(--ink-soft); font-size: 12.5px; }
+
+  /* 小贴纸 */
+  .sticker {
+    position: absolute;
+    display: inline-block;
+    font-family: "Caveat", "Ma Shan Zheng", cursive;
+    background: var(--yellow);
+    color: #7A6A4A;
+    font-size: 16px; line-height: 1;
+    padding: 12px 14px;
+    border-radius: 14px 14px 14px 4px;
+    box-shadow: 0 5px 0 rgba(196,168,130,.25);
+    transform: rotate(5deg);
+    transition: transform .4s var(--bounce);
+  }
+  .sticker:hover { transform: rotate(0) scale(1.08); }
+
+  /* 打印 */
+  @media print {
+    body { background: #fff; padding: 0; }
+    body { background-image: none !important; }
+    .sheet { box-shadow: none; border: none; border-radius: 0; }
+    .sticker { display: none; }
+  }
+  @media (max-width: 760px) {
+    .head, .body { padding-left: 24px; padding-right: 24px; }
+    .intro-bar { margin-left: 24px; margin-right: 24px; }
+    .body { grid-template-columns: 1fr; }
+    .id h1 { font-size: 34px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sheet">
+  <div class="head">
+    <div class="sticker" style="right:34px; top:26px; background:var(--yellow)">Open to work ✦</div>
+    <div class="sticker" style="left:60%; top:40px; transform:rotate(-6deg); background:var(--pink-soft); color:#A9756B; display:none">· · ·</div>
+
+    <div class="head-top">
+      <div class="avatar">🙂</div>
+      <div class="id">
+        <h1>林 小 甜 <span style="font-size:20px;color:var(--ink-soft)">/ XiaoTian Lin</span></h1>
+        <span class="tagline">✿ 创意设计师 · 插画爱好者</span>
+        <p class="sub">相信「干净、甜、但不过度甜腻」的设计，<b>让每个界面都像会让人心情变好的文具桌</b>。</p>
+      </div>
+    </div>
+
+    <div class="contact">
+      <span class="chip">✉ tianlin@example.com</span>
+      <span class="chip">✆ 138 0000 0000</span>
+      <span class="chip">◉ 杭州 · 可远程</span>
+      <span class="chip plain">作品集 ✿ itsme.example</span>
+      <span class="chip plain">GitHub ♡ tian-codes</span>
+    </div>
+
+    <div class="intro-bar">
+      <b>一句话自我介绍：</b>4 年经验的全栈向创意设计师，擅长把「可爱的情绪」翻译成「清晰的界面」。
+      主导过 3 款面向年轻用户的产品改版，DAU 提升 42%；喜欢像素对齐、圆角、以及一切软糖色。
+    </div>
+  </div>
+
+  <div class="body">
+    <!-- 左栏 -->
+    <div>
+      <div class="sec">
+        <div class="sec-head">
+          <span class="badge" style="background:var(--pink-soft)">✿</span>
+          <h2>技能</h2>
+          <span class="sq"></span>
+        </div>
+
+        <div class="skill-row">
+          <div class="top"><span>UI / 视觉设计</span><span class="lvl">熟练</span></div>
+          <div class="bar"><i data-w="90"></i></div>
+        </div>
+        <div class="skill-row">
+          <div class="top"><span>插画 / 手绘</span><span class="lvl">熟练</span></div>
+          <div class="bar"><i data-w="85"></i></div>
+        </div>
+        <div class="skill-row">
+          <div class="top"><span>动效设计</span><span class="lvl">进阶</span></div>
+          <div class="bar"><i data-w="75"></i></div>
+        </div>
+        <div class="skill-row">
+          <div class="top"><span>前端实现 HTML/CSS/JS</span><span class="lvl">进阶</span></div>
+          <div class="bar"><i data-w="78"></i></div>
+        </div>
+
+        <div class="skill-tags" style="margin-top:14px">
+          <span>Figma</span><span>Illustrator</span><span>Procreate</span>
+          <span>Blender</span><span>After Effects</span><span>Vue</span><span>Motion</span>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-head">
+          <span class="badge" style="background:var(--mint-soft)">♡</span>
+          <h2>教育</h2>
+          <span class="sq"></span>
+        </div>
+        <div class="edu">
+          <div class="where">某某美术学院 · 视觉传达设计</div>
+          <div class="when">2018.09 — 2022.06 · 本科</div>
+          <div class="maj">主修品牌与插画方向，毕业设计《糖果药房》获校级优秀毕设。</div>
+        </div>
+        <div class="edu">
+          <div class="where">某某设计学院 · UI 进阶班</div>
+          <div class="when">2023.03 — 2023.08</div>
+          <div class="maj">系统学习动效与设计系统搭建。</div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-head">
+          <span class="badge" style="background:var(--purple-soft)">☁</span>
+          <h2>语言</h2>
+          <span class="sq"></span>
+        </div>
+        <div class="lang"><span class="l">中文</span><span class="r">母语</span></div>
+        <div class="lang"><span class="l">English</span><span class="r">CET-6 · 可日常沟通</span></div>
+        <div class="lang"><span class="l">日语</span><span class="r">入门自学中 · 五十音完成</span></div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-head">
+          <span class="badge" style="background:var(--yellow-soft)">✦</span>
+          <h2>兴趣</h2>
+          <span class="sq"></span>
+        </div>
+        <div class="skill-tags">
+          <span>📷 胶片摄影</span><span>☕ 手冲咖啡</span><span>🧸 玩具收藏</span><span>🌷 养多肉</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右栏 -->
+    <div>
+      <div class="sec">
+        <div class="sec-head">
+          <span class="badge" style="background:var(--pink-soft)">✉</span>
+          <h2>工作经历</h2>
+          <span class="sq"></span>
+        </div>
+        <div class="timeline">
+          <div class="tl-item">
+            <span class="when">2023.07 — 至今</span>
+            <h3>资深创意设计师</h3>
+            <div class="org">某某设计工作室 · 杭州</div>
+            <ul>
+              <li>负责面向学生与创作者的学习工具产品，主导设计系统「奶油风」落地，组件复用率 70%+。</li>
+              <li>改版后新手引导完成率提升 35%，用户次日留存提升 12%。</li>
+              <li>带 2 人小组，制定视觉规范与插画组件库。</li>
+            </ul>
+          </div>
+          <div class="tl-item">
+            <span class="when">2021.09 — 2023.06</span>
+            <h3>视觉设计师</h3>
+            <div class="org">某某互动科技有限公司 · 上海</div>
+            <ul>
+              <li>参与 6 个休闲向 App 的视觉与运营设计，单次活动参与用户 20w+。</li>
+              <li>建立吉祥物 IP 表情体系，被多个运营活动复用。</li>
+            </ul>
+          </div>
+          <div class="tl-item">
+            <span class="when">2020.06 — 2020.09</span>
+            <h3>设计实习生</h3>
+            <div class="org">某某互联网公司 · 暑期实习</div>
+            <ul>
+              <li>协助完成 3 套活动页视觉与切图规范，学习组件化思维。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-head">
+          <span class="badge" style="background:var(--mint-soft)">✿</span>
+          <h2>个人项目</h2>
+          <span class="sq"></span>
+        </div>
+        <div class="timeline">
+          <div class="tl-item">
+            <span class="when">2024 · 独立开发</span>
+            <h3>「甜桌 SweetDesk」创意工作台</h3>
+            <div class="org">Kawaii Minimal 风格的轻量工作台，纯 HTML/CSS/JS 实现</div>
+            <ul>
+              <li>低饱和糖果色 + 波点奶油背景，卡片贴纸质感。</li>
+              <li>回弹缓动动效，hover 上浮 2px，200–300ms 轻软反馈。</li>
+            </ul>
+          </div>
+          <div class="tl-item">
+            <span class="when">2023 · 插画系列</span>
+            <h3>「糖果药房」贴纸系列</h3>
+            <div class="org">Procreate 手绘 · 淘宝小店在售</div>
+            <ul>
+              <li>40+ 张低饱和软糖系贴纸，累计售出 3000+ 张。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+/* 技能条滚动进场 */
+const bars = $$('.skill-row .bar i');
+const io = new IntersectionObserver(es => {
+  es.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.style.width = e.target.dataset.w + '%';
+      io.unobserve(e.target);
+    }
+  });
+}, { threshold: .4 });
+bars.forEach(b => io.observe(b));
+</script>
+</body>
+</html>
