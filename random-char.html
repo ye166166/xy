@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>随便写一个字</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #fdf6ec 0%, #ffe8d6 100%);
+    padding: 24px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+    padding: 48px 56px;
+    text-align: center;
+    max-width: 480px;
+    width: 100%;
+  }
+  h1 {
+    font-size: 22px;
+    color: #8a5a2b;
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+  }
+  .sub {
+    font-size: 14px;
+    color: #b08d68;
+    margin-bottom: 32px;
+  }
+  .char-box {
+    font-size: 180px;
+    line-height: 1;
+    color: #5b4632;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+  .char-box .hint {
+    font-size: 24px;
+    color: #ccc3b8;
+  }
+  .btns {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-top: 40px;
+  }
+  button {
+    font-size: 16px;
+    padding: 12px 28px;
+    border: none;
+    border-radius: 40px;
+    cursor: pointer;
+    transition: all .2s;
+    font-family: inherit;
+  }
+  .btn-random {
+    background: #e8893c;
+    color: #fff;
+  }
+  .btn-random:hover { background: #d97a2c; transform: translateY(-2px); }
+  .btn-write {
+    background: #fff;
+    color: #8a5a2b;
+    border: 2px solid #e3cdb4;
+  }
+  .btn-write:hover { border-color: #c9a876; background: #fdf6ec; }
+  .write-area {
+    margin-top: 24px;
+    display: none;
+  }
+  .write-area.show { display: block; }
+  textarea {
+    width: 100%;
+    min-height: 64px;
+    border: 2px solid #e3cdb4;
+    border-radius: 12px;
+    padding: 12px;
+    font-size: 18px;
+    font-family: inherit;
+    resize: vertical;
+    outline: none;
+  }
+  textarea:focus { border-color: #e8893c; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>随便写一个字</h1>
+    <p class="sub">随机抽一个字，或者你自己写一个</p>
+    <div class="char-box" id="charBox">
+      <span class="hint">?</span>
+    </div>
+    <div class="btns">
+      <button class="btn-random" onclick="randomChar()">随机抽字</button>
+      <button class="btn-write" onclick="toggleWrite()">自己写</button>
+    </div>
+    <div class="write-area" id="writeArea">
+      <textarea id="input" maxlength="1" placeholder="输入一个字…" oninput="showWritten(this.value)"></textarea>
+    </div>
+  </div>
+
+<script>
+  const chars = "天地玄黄宇宙洪荒日月盈昃辰宿列张寒来暑往秋收冬藏金木水火土仁义礼智信山河湖海春夏秋冬风雨雷电笔墨纸砚诗词歌赋";
+  const charBox = document.getElementById('charBox');
+  const writeArea = document.getElementById('writeArea');
+
+  function randomChar() {
+    const c = chars[Math.floor(Math.random() * chars.length)];
+    charBox.innerHTML = c;
+    writeArea.classList.remove('show');
+    document.getElementById('input').value = '';
+  }
+
+  function toggleWrite() {
+    writeArea.classList.toggle('show');
+    if (writeArea.classList.contains('show')) {
+      document.getElementById('input').focus();
+    }
+  }
+
+  function showWritten(v) {
+    charBox.innerHTML = v || '<span class="hint">?</span>';
+  }
+</script>
+</body>
+</html>
