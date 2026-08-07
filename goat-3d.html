@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D 山羊 - WASD移动 空格跳跃</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: hidden; background: #000; font-family: sans-serif; }
+canvas { display: block; }
+#info {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  color: rgba(255,255,255,0.7); font-size: 14px;
+  background: rgba(0,0,0,0.5); padding: 8px 20px; border-radius: 20px;
+  pointer-events: none; user-select: none;
+}
+#charge-bar {
+  position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+  display: none; gap: 6px; pointer-events: none;
+}
+.charge-cell {
+  width: 36px; height: 18px; border-radius: 3px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.25);
+  transition: background 0.08s;
+}
+.charge-cell.filled1 { background: #ff6644; }
+.charge-cell.filled2 { background: #ffaa00; }
+.charge-cell.filled3 { background: #44dd66; }
+#cd-bar {
+  position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+  width: 114px; height: 10px; background: rgba(0,0,0,0.4);
+  border-radius: 5px; display: none; pointer-events: none; overflow: hidden;
+}
+#cd-fill {
+  height: 100%; width: 0%; background: #88aaff;
+  border-radius: 5px; transition: width 0.05s;
+}
+</style>
+</head>
+<body>
+<div id="info">W S 移动 · Q 奔跑 · 空格 跳跃 · 左键蓄力冲刺/头槌 · 右键伸舌抓取 · 鼠标移动视角 · 撞破铁笼逃出去!</div>
+<div id="charge-bar">
+  <div class="charge-cell" id="cell1"></div>
+  <div class="charge-cell" id="cell2"></div>
+  <div class="charge-cell" id="cell3"></div>
+</div>
+<div id="cd-bar"><div id="cd-fill"></div></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.Fog(0x87CEEB, 80, 150);
+
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 200);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+document.body.prepend(renderer.domElement);
+
+// ---- 灯光 ----
+const ambient = new THREE.AmbientLight(0x404060, 0.6);
+scene.add(ambient);
+const hemi = new THREE.HemisphereLight(0x87CEEB, 0x3a7d44, 0.8);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffeedd, 2);
+sun.position.set(30, 40, 20);
+sun.castShadow = true;
+sun.shadow.mapSize.width = 2048;
+sun.shadow.mapSize.height = 2048;
+sun.shadow.camera.near = 0.5;
+sun.shadow.camera.far = 100;
+sun.shadow.camera.left = -50;
+sun.shadow.camera.right = 50;
+sun.shadow.camera.top = 50;
+sun.shadow.camera.bottom = -50;
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x8888ff, 0.4);
+fill.position.set(-20, 10, -20);
+scene.add(fill);
+
+// ---- 动物园场景 ----
+const groundGeo = new THREE.PlaneGeometry(200, 200);
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x5a8a4a, roughness: 0.9 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.05;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const colliders = [];
+function addCollider(cx, cz, hw, hd) {
+  const c = { x: cx, z: cz, hw, hd, active: true };
+  colliders.push(c);
+  return c;
+}
+
+// 可交互物理物件
+const physObjects = [];
+const grabbableObjects = [];
+function makePhysObj(mesh, x, z, hw, hd) {
+  mesh.position.set(x, 0, z);
+  mesh.castShadow = true; mesh.receiveShadow = true; scene.add(mesh);
+  const col = addCollider(x, z, hw, hd);
+  const obj = { mesh, pos: mesh.position, velX: 0, velZ: 0, velY: 0, collider: col, state: 'idle' };
+  physObjects.push(obj);
+  grabbableObjects.push(obj);
+  return obj;
+}
+
+// 草地装饰
+const grassBladeMat2 = new THREE.MeshStandardMaterial({ color: 0x5cb85c, roughness: 1 });
+for (let i = 0; i < 3000; i++) {
+  const b = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.06 + Math.random() * 0.1, 0.03), grassBladeMat2);
+  const x = (Math.random() - 0.5) * 180;
+  const z = (Math.random() - 0.5) * 180;
+  let skip = false;
+  for (const [px, pz, pw, pd] of [
+    [0, 0, 5, 200], [30, 0, 5, 200], [-30, 0, 5, 200],
+    [0, 30, 5, 200], [0, -30, 5, 200],
+  ]) {
+    if (Math.abs(x - px) < pw / 2 + 0.3 && Math.abs(z - pz) < pd / 2 + 0.3) { skip = true; break; }
+  }
+  if (Math.abs(x) < 4 && Math.abs(z) < 4) skip = true;
+  if (skip) continue;
+  b.position.set(x, 0.03, z);
+  scene.add(b);
+}
+
+// 公路（长条连续，带转折）
+const roadMat = new THREE.MeshStandardMaterial({ color: 0x666677, roughness: 0.85 });
+function buildRoad(x, z, w, l, angle) {
+  const r = new THREE.Mesh(new THREE.BoxGeometry(w, 0.06, l), roadMat);
+  r.position.set(x, 0, z);
+  if (angle) r.rotation.y = angle;
+  r.receiveShadow = true; scene.add(r);
+}
+buildRoad(0, 30, 5, 70);   // 纵1
+buildRoad(0, -40, 5, 50);  // 纵2
+buildRoad(30, 15, 5, 50);  // 纵3
+buildRoad(-30, 15, 5, 50); // 纵4
+buildRoad(15, 0, 5, 30, 0.5);   // 斜路
+buildRoad(-15, 0, 5, 30, -0.5); // 斜路
+
+// ========== 起始铁笼 ==========
+const cageMat = new THREE.MeshStandardMaterial({ color: 0x888899, roughness: 0.5, metalness: 0.4 });
+const barMat = new THREE.MeshStandardMaterial({ color: 0x777788, roughness: 0.5, metalness: 0.5 });
+const cageFloor = new THREE.Mesh(new THREE.BoxGeometry(6, 0.1, 6), new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.9 }));
+cageFloor.position.set(0, 0, 0); cageFloor.receiveShadow = true; scene.add(cageFloor);
+
+const cageBars = [];
+const CS = 3, BAR_R = 0.06;
+
+// 后墙 (z=3)
+for (let x = -2.7; x <= 2.7; x += 0.5) {
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(BAR_R, BAR_R, 2, 6), barMat);
+  bar.position.set(x, 1, 3); bar.castShadow = true; scene.add(bar);
+  const col = addCollider(x, 3, BAR_R * 2, BAR_R * 2);
+  if (Math.abs(x) < 0.8) { cageBars.push({ mesh: bar, collider: col, broken: false }); }
+}
+// 左墙 (x=-3)
+for (let z = -2.7; z <= 2.7; z += 0.5) {
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(BAR_R, BAR_R, 2, 6), barMat);
+  bar.position.set(-3, 1, z); bar.castShadow = true; scene.add(bar);
+  addCollider(-3, z, BAR_R * 2, BAR_R * 2);
+}
+// 右墙 (x=3)
+for (let z = -2.7; z <= 2.7; z += 0.5) {
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(BAR_R, BAR_R, 2, 6), barMat);
+  bar.position.set(3, 1, z); bar.castShadow = true; scene.add(bar);
+  addCollider(3, z, BAR_R * 2, BAR_R * 2);
+}
+// 前墙 (z=-3) - 含可撞破的笼门
+for (let x = -2.7; x <= 2.7; x += 0.5) {
+  if (Math.abs(x) < 1.1) continue; // 门洞
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(BAR_R, BAR_R, 2, 6), barMat);
+  bar.position.set(x, 1, -3); bar.castShadow = true; scene.add(bar);
+  addCollider(x, -3, BAR_R * 2, BAR_R * 2);
+}
+// 可撞破的门栏 (前墙门洞处3根)
+const gateBars = [];
+for (const gx of [-0.6, 0, 0.6]) {
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(BAR_R * 1.5, BAR_R * 1.5, 2, 6),
+    new THREE.MeshStandardMaterial({ color: 0xaa5555, roughness: 0.5 }));
+  bar.position.set(gx, 1, -3); bar.castShadow = true; scene.add(bar);
+  const col = addCollider(gx, -3, BAR_R * 3, BAR_R * 3);
+  gateBars.push({ mesh: bar, collider: col, broken: false });
+}
+
+// 笼顶横梁
+const beamMat = new THREE.MeshStandardMaterial({ color: 0x666677, roughness: 0.5, metalness: 0.3 });
+for (const [bx, bz, bw, bd] of [[0, 3, 6, 0.1], [0, -3, 6, 0.1], [-3, 0, 0.1, 6], [3, 0, 0.1, 6]]) {
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.08, bd), beamMat);
+  beam.position.set(bx, 2, bz); scene.add(beam);
+}
+
+// 煤气罐
+const tankMat = new THREE.MeshStandardMaterial({ color: 0xcc3333, roughness: 0.6 });
+const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 0.55, 10), tankMat);
+const valve = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6),
+  new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.3, metalness: 0.6 }));
+valve.position.y = 0.3;
+tank.add(valve);
+const gasCan = makePhysObj(tank, 1.5, 0, 1.5, 0.3, 0.3);
+gasCan.state = 'idle';
+
+// ========== 动物铁笼（同起始笼风格） ==========
+const CS2 = 3.5;
+function buildAnimalCage(cx, cz) {
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(CS2 * 2, 0.08, CS2 * 2),
+    new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.9 }));
+  floor.position.set(cx, 0, cz); floor.receiveShadow = true; scene.add(floor);
+  for (let x = cx - CS2 + 0.3; x <= cx + CS2 - 0.3; x += 0.6) {
+    for (const z of [cz - CS2, cz + CS2]) {
+      const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 6), barMat);
+      bar.position.set(x, 0.75, z); bar.castShadow = true; scene.add(bar);
+      addCollider(x, z, 0.06, 0.06);
+    }
+  }
+  for (let z = cz - CS2 + 0.3; z <= cz + CS2 - 0.3; z += 0.6) {
+    for (const x of [cx - CS2, cx + CS2]) {
+      const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 6), barMat);
+      bar.position.set(x, 0.75, z); bar.castShadow = true; scene.add(bar);
+      addCollider(x, z, 0.06, 0.06);
+    }
+  }
+}
+buildAnimalCage(0, 18);
+buildAnimalCage(10, 8);
+buildAnimalCage(-10, 8);
+
+// ========== 交互物件 ==========
+// 长椅
+const benchMat = new THREE.MeshStandardMaterial({ color: 0x8B5E3C, roughness: 0.9 });
+const benchMetal = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.7, metalness: 0.4 });
+for (const [bx, bz] of [[2, 8], [-2, 8], [5, 16], [-5, 16]]) {
+  const g = new THREE.Group();
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.5), benchMat);
+  seat.position.y = 0.35; g.add(seat);
+  for (const side of [-1, 1]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.35, 6), benchMetal);
+    leg.position.set(side * 0.45, 0.18, 0); g.add(leg);
+  }
+  g.position.set(bx, 0, bz);
+  scene.add(g);
+  const phys = makePhysObj(new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0x8B5E3C, roughness: 0.9 })), bx, bz, 0.6, 0.3);
+  phys.mesh.visible = false;
+  phys._visual = g;
+}
+// 垃圾桶（灰色圆柱 + 盖子）
+const trashMat2 = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.7 });
+const lidMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.6 });
+for (const [tx, tz] of [
+  [4, 4], [-4, 4], [4, 14], [-4, 14], [0, 26],
+  [-14, 8], [14, 8], [-14, 18], [14, 18], [-8, -4], [8, -4],
+]) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.6, 8), trashMat2);
+  body.position.y = 0.3; g.add(body);
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.26, 0.06, 8), lidMat);
+  lid.position.y = 0.63; g.add(lid);
+  g.position.set(tx, 0, tz);
+  scene.add(g);
+  const phys = makePhysObj(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, 0.66, 6),
+    new THREE.MeshStandardMaterial({ visible: false })), tx, tz, 0.28, 0.28);
+  phys.mesh.visible = false;
+  phys._visual = g;
+}
+// 路灯（可撞倒）路两边各15个
+const lampMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.6, metalness: 0.5 });
+const lightMat = new THREE.MeshStandardMaterial({ color: 0xffee88, roughness: 0.3 });
+for (let i = 0; i < 15; i++) {
+  const z = -20 + i * 6 + (i % 2) * 3;
+  for (const side of [-1, 1]) {
+    const lx = side * (2.5 + i * 0.8);
+    const g = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 2, 6), lampMat);
+    pole.position.y = 1; g.add(pole);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.03, 0.03), lampMat);
+    arm.position.set(side * 0.2, 1.9, 0); g.add(arm);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), lightMat);
+    bulb.position.set(side * 0.38, 1.85, 0); g.add(bulb);
+    g.position.set(lx, 0, z); scene.add(g);
+    const phys = makePhysObj(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 2, 6),
+      new THREE.MeshStandardMaterial({ visible: false })), lx, z, 0.08, 0.08);
+    phys.mesh.visible = false; phys._visual = g;
+  }
+}
+
+// ========== 树木 ==========
+const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4c3b, roughness: 0.9 });
+const leafMat = new THREE.MeshStandardMaterial({ color: 0x2d8a2d, roughness: 0.8 });
+function createTree(x, z, s) {
+  const g = new THREE.Group();
+  const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * (s||1), 0.26 * (s||1), 1.3 * (s||1), 6), trunkMat);
+  tr.position.y = 0.65 * (s||1); tr.castShadow = true; g.add(tr);
+  const cr = new THREE.Mesh(new THREE.SphereGeometry(0.75*(s||1), 7, 7), leafMat);
+  cr.position.y = 1.6*(s||1); cr.castShadow = true; g.add(cr);
+  g.position.set(x, 0, z); scene.add(g);
+  addCollider(x, z, 0.22, 0.22);
+}
+const treePos = [
+  [-9, 5], [9, 5], [-9, 12], [9, 12], [-4, 22], [4, 22],
+  [-14, 8], [14, 8], [-14, 16], [14, 16], [-6, -3], [6, -3],
+  [-12, -5], [12, -5], [0, -5], [-7, 25], [7, 25],
+  [-15, -3], [15, -3], [-16, 12], [16, 12],
+];
+for (const t of treePos) createTree(t[0], t[1], t[2] || 1);
+
+// 煤气罐碰撞 + 破门检测用引用
+const gasCanRef = gasCan;
+const gateBarsRef = gateBars;
+
+// 爆炸粒子系统
+const explosionParticles = [];
+function createExplosion(x, y, z) {
+  const cols = [0xff6622, 0xffaa44, 0xff4400, 0xffcc00];
+  const mats = cols.map(c => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.8 }));
+  for (let i = 0; i < 50; i++) {
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.08 + Math.random() * 0.1, 5, 5), mats[i % 4]);
+    p.position.set(x, y, z); scene.add(p);
+    const a = Math.random() * Math.PI * 2, b = Math.random() * Math.PI;
+    const spd = 3 + Math.random() * 10;
+    explosionParticles.push({
+      mesh: p, vx: Math.sin(b) * Math.cos(a) * spd, vy: Math.cos(b) * spd + 3,
+      vz: Math.sin(b) * Math.sin(a) * spd, life: 0.6 + Math.random() * 0.6,
+    });
+  }
+  const flash = new THREE.Mesh(new THREE.SphereGeometry(0.8, 10, 10),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffaa44, emissiveIntensity: 3 }));
+  flash.position.set(x, y, z); scene.add(flash);
+  explosionParticles.push({ mesh: flash, vx: 0, vy: 0, vz: 0, life: 0.4, isFlash: true });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.2, 1.2, 24),
+    new THREE.MeshStandardMaterial({ color: 0xff8800, emissive: 0xff6600, emissiveIntensity: 1.5, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(x, 0.02, z); scene.add(ring);
+  explosionParticles.push({ mesh: ring, vx: 0, vy: 0, vz: 0, life: 0.7, isRing: true });
+  // 冲击波圈
+  for (let j = 0; j < 3; j++) {
+    const r2 = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.6, 16),
+      new THREE.MeshStandardMaterial({ color: 0xffcc66, emissive: 0xff8800, emissiveIntensity: 1, side: THREE.DoubleSide, transparent: true, opacity: 0.6 }));
+    r2.rotation.x = -Math.PI / 2; r2.position.set(x + (j-1)*0.5, 0.04, z + (j-1)*0.5); scene.add(r2);
+    explosionParticles.push({ mesh: r2, vx: 0, vy: 0, vz: 0, life: 0.5 + j*0.1, isRing: true });
+  }
+}
+
+// 山羊倒地受击
+let isStunned = false;
+let stunTimer = 0;
+let knockbackMult = 1;
+
+// ---- 山羊 ----
+const goat = new THREE.Group();
+
+const furMat = new THREE.MeshStandardMaterial({ color: 0xE8DCC8, roughness: 0.9 });
+const darkFurMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.9 });
+const hornMat = new THREE.MeshStandardMaterial({ color: 0x5a4a3a, roughness: 0.7, metalness: 0.3 });
+const eyeMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1 });
+const noseMat = new THREE.MeshStandardMaterial({ color: 0xdd9988, roughness: 0.8 });
+const beardMat = new THREE.MeshStandardMaterial({ color: 0xddd4c0, roughness: 0.9 });
+
+const body = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.7, 1.6), furMat);
+body.position.y = 0.6;
+body.castShadow = true;
+body.receiveShadow = true;
+goat.add(body);
+
+// 头部组装（整体前移实现头槌动画）
+const headGroup = new THREE.Group();
+headGroup.position.set(0, 0.95, 0.75);
+goat.add(headGroup);
+
+const neck = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.3, 0.35), furMat);
+neck.castShadow = true;
+neck.receiveShadow = true;
+headGroup.add(neck);
+
+const headMesh = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.7), furMat);
+headMesh.position.set(0, 0.15, 0.35);
+headMesh.castShadow = true;
+headMesh.receiveShadow = true;
+headGroup.add(headMesh);
+
+const snout = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.3), furMat);
+snout.position.set(0, 0.05, 0.75);
+snout.castShadow = true;
+snout.receiveShadow = true;
+headGroup.add(snout);
+
+const nose = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), noseMat);
+nose.position.set(0, 0.05, 0.90);
+headGroup.add(nose);
+
+for (const side of [-1, 1]) {
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 12), eyeMat);
+  eye.position.set(side * 0.22, 0.25, 0.60);
+  headGroup.add(eye);
+  const white = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+  white.position.set(side * 0.18, 0.27, 0.64);
+  headGroup.add(white);
+}
+
+for (const side of [-1, 1]) {
+  const ear = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.1, 0.25), furMat);
+  ear.position.set(side * 0.35, 0.20, 0.30);
+  ear.rotation.z = side * 0.4;
+  ear.rotation.x = -0.2;
+  ear.castShadow = true;
+  headGroup.add(ear);
+}
+
+for (const side of [-1, 1]) {
+  const horn = new THREE.Group();
+  for (let j = 0; j < 6; j++) {
+    const seg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.12), hornMat);
+    seg.position.set(0, j * 0.12, -j * 0.04);
+    seg.rotation.x = j * 0.15;
+    horn.add(seg);
+  }
+  horn.position.set(side * 0.25, 0.35, 0.20);
+  horn.rotation.x = -0.3;
+  horn.rotation.z = side * 0.2;
+  headGroup.add(horn);
+}
+
+const beard = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.2, 0.05), beardMat);
+beard.position.set(0, -0.10, 0.80);
+beard.rotation.x = 0.3;
+headGroup.add(beard);
+
+const legPositions = [
+  [-0.4, 0.3, -0.6],
+  [0.4, 0.3, -0.6],
+  [-0.4, 0.3, 0.6],
+  [0.4, 0.3, 0.6],
+];
+const legs = [];
+for (const [lx, ly, lz] of legPositions) {
+  const leg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.6, 0.16), darkFurMat);
+  leg.position.set(lx, ly, lz);
+  leg.castShadow = true;
+  leg.receiveShadow = true;
+  goat.add(leg);
+  legs.push(leg);
+}
+for (const [lx, ly, lz] of legPositions) {
+  const hoof = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.06, 0.2), new THREE.MeshStandardMaterial({ color: 0x2a1a0a }));
+  hoof.position.set(lx, ly - 0.3, lz);
+  goat.add(hoof);
+}
+
+const tail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.2), furMat);
+tail.position.set(0, 0.7, -0.9);
+tail.rotation.x = 0.4;
+goat.add(tail);
+
+goat.position.y = 0;
+goat.castShadow = true;
+goat.scale.set(0.7, 0.7, 0.7);
+scene.add(goat);
+
+const HEADGROUP_Z0 = 0.75;
+
+// ---- NPC 小人 ----
+const npcColors = [0x4285f4, 0xea4335, 0xfbbc04, 0x34a853, 0xff6d01, 0x46bdc6, 0xab47bc, 0xe67c73];
+const npcs = [];
+
+function createNPC(x, z) {
+  const group = new THREE.Group();
+  const pivot = new THREE.Group();
+  pivot.position.y = 0;
+  group.add(pivot);
+
+  const color = npcColors[Math.floor(Math.random() * npcColors.length)];
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.8 });
+  const skinMat = new THREE.MeshStandardMaterial({ color: 0xfdd9b5, roughness: 0.8 });
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.75, 0.28), mat);
+  body.position.y = 0.85;
+  body.castShadow = true;
+  pivot.add(body);
+
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), skinMat);
+  head.position.y = 1.4;
+  head.castShadow = true;
+  pivot.add(head);
+
+  for (const side of [-1, 1]) {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.38, 0.08), skinMat);
+    arm.position.set(side * 0.3, 0.8, 0);
+    arm.castShadow = true;
+    pivot.add(arm);
+  }
+
+  for (const side of [-1, 1]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.32, 0.1), new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.9 }));
+    leg.position.set(side * 0.1, 0.22, 0);
+    leg.castShadow = true;
+    pivot.add(leg);
+  }
+
+  group.position.set(x, 0, z);
+  group.rotation.y = Math.random() * Math.PI * 2;
+  scene.add(group);
+
+  npcs.push({
+    group,
+    pivot,
+    velX: 0, velZ: 0, velY: 0,
+    state: 'idle',
+    downTimer: 0,
+    downDuration: 4,
+    wanderAngle: Math.random() * Math.PI * 2,
+    wanderTimer: 1 + Math.random() * 2,
+    isWalking: true,
+    color,
+  });
+}
+
+for (let i = 0; i < 8; i++) {
+  const angle = Math.random() * Math.PI * 2;
+  const dist = 8 + Math.random() * 15;
+  createNPC(Math.cos(angle) * dist, Math.sin(angle) * dist);
+}
+
+// ---- 控制 ----
+const keys = { w: false, s: false, space: false, q: false, shift: false, z: false };
+window.addEventListener('keydown', (e) => {
+  switch (e.code) {
+    case 'KeyW': keys.w = true; e.preventDefault(); break;
+    case 'KeyS': keys.s = true; e.preventDefault(); break;
+    case 'Space': keys.space = true; e.preventDefault(); break;
+    case 'KeyQ': keys.q = true; e.preventDefault(); break;
+    case 'KeyZ':
+      if (!isStunned) { isStunned = true; stunTimer = 0; knockbackMult = 2; }
+      keys.z = true; e.preventDefault(); break;
+    case 'ShiftLeft': case 'ShiftRight': keys.shift = true; e.preventDefault(); break;
+  }
+});
+window.addEventListener('keyup', (e) => {
+  switch (e.code) {
+    case 'KeyW': keys.w = false; e.preventDefault(); break;
+    case 'KeyS': keys.s = false; e.preventDefault(); break;
+    case 'Space': keys.space = false; e.preventDefault(); break;
+    case 'KeyQ': keys.q = false; e.preventDefault(); break;
+    case 'KeyZ': keys.z = false; e.preventDefault(); break;
+    case 'ShiftLeft': case 'ShiftRight': keys.shift = false; e.preventDefault(); break;
+  }
+});
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ---- 鼠标视角 + 头槌 + 舌头 ----
+let cameraAzimuth = 0;
+let cameraElevation = 0.55;
+const camRadius = 11;
+
+document.addEventListener('pointerlockchange', () => {
+  // cursor hid when locked
+});
+renderer.domElement.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  if (cooldownTimer > 0) return;
+  isCharging = true;
+  chargeStart = performance.now();
+  document.getElementById('charge-bar').style.display = 'flex';
+  for (let i = 1; i <= 3; i++) document.getElementById('cell' + i).className = 'charge-cell';
+  if (document.pointerLockElement !== renderer.domElement) {
+    renderer.domElement.requestPointerLock();
+  }
+});
+renderer.domElement.addEventListener('mouseup', (e) => {
+  if (e.button !== 0 || !isCharging) return;
+  isCharging = false;
+  document.getElementById('charge-bar').style.display = 'none';
+  const duration = (performance.now() - chargeStart) / 1000;
+  if (duration < 0.12) {
+    tryHeadbutt();
+  } else {
+    const t = Math.min(duration, 3);
+    const impulse = 4 + t * 3;
+    const fwd = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), goat.rotation.y);
+    chargeVelX = fwd.x * impulse;
+    chargeVelZ = fwd.z * impulse;
+    tryHeadbutt();
+    chargeLevel = Math.min(Math.floor(t) + 1, 3);
+    cooldownDuration = [0, 1.5, 3, 5][chargeLevel];
+    cooldownTimer = cooldownDuration;
+    document.getElementById('cd-bar').style.display = 'block';
+  }
+});
+document.addEventListener('mousemove', (e) => {
+  if (document.pointerLockElement === renderer.domElement) {
+    cameraAzimuth -= e.movementX * 0.003;
+    cameraElevation = Math.max(0.2, Math.min(1.2, cameraElevation - e.movementY * 0.003));
+  }
+});
+renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+document.addEventListener('mousedown', (e) => {
+  if (e.button === 2) {
+    if (isGrabbing) releaseGrab();
+    else tryGrab();
+  }
+});
+
+// ---- 头槌 ----
+let isHeadbutting = false;
+let headbuttTimer = 0;
+let headbuttHit = false;
+const HEADBUTT_FORWARD = 0.1;
+const HEADBUTT_BACK = 0.08;
+const HEADBUTT_EXTEND = 0.45;
+
+let dashVelX = 0, dashVelZ = 0;
+let chargeVelX = 0, chargeVelZ = 0;
+let isCharging = false;
+let chargeStart = 0;
+let chargeLevel = 0;
+let cooldownTimer = 0;
+let cooldownDuration = 0;
+
+function tryHeadbutt() {
+  if (isHeadbutting) return;
+  isHeadbutting = true;
+  headbuttTimer = 0;
+  headbuttHit = false;
+  const fwd = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), goat.rotation.y);
+  dashVelX = fwd.x * 10;
+  dashVelZ = fwd.z * 10;
+}
+
+// ---- 舌头 ----
+const tongueMat = new THREE.MeshStandardMaterial({ color: 0xff7777, roughness: 0.4 });
+const tongueSegs = [];
+for (let i = 0; i < 15; i++) {
+  const size = 0.04 + (i / 14) * 0.04;
+  const seg = new THREE.Mesh(new THREE.SphereGeometry(size, 6, 6), tongueMat);
+  seg.visible = false;
+  scene.add(seg);
+  tongueSegs.push(seg);
+}
+
+let isGrabbing = false;
+let grabbedTarget = null;
+
+function tryGrab() {
+  if (isGrabbing || isHeadbutting) return;
+  const mouthPos = new THREE.Vector3();
+  nose.getWorldPosition(mouthPos);
+  let closest = null;
+  let closestDist = 4;
+  let closestType = '';
+  for (const npc of npcs) {
+    if (npc.state === 'knocked') continue;
+    const dx = npc.group.position.x - mouthPos.x;
+    const dz = npc.group.position.z - mouthPos.z;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d < closestDist) {
+      closestDist = d;
+      closest = npc;
+      closestType = 'npc';
+    }
+  }
+  for (const obj of grabbableObjects) {
+    if (obj.state === 'grabbed' || (!obj._visual && obj.mesh && !obj.mesh.visible)) continue;
+    const op = obj.pos || obj.position;
+    const dx = op.x - mouthPos.x;
+    const dz = op.z - mouthPos.z;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d < closestDist) {
+      closestDist = d;
+      closest = obj;
+      closestType = 'obj';
+    }
+  }
+  if (!closest) return;
+  isGrabbing = true;
+  grabbedTarget = { ref: closest, type: closestType };
+  if (closestType === 'npc') {
+    closest.state = 'grabbed';
+    closest.velX = 0; closest.velZ = 0; closest.velY = 0;
+    closest.downTimer = 0;
+  } else {
+    closest.state = 'grabbed';
+    closest.velX = 0; closest.velZ = 0; closest.velY = 0;
+    if (closest.collider) closest.collider.active = false;
+  }
+}
+
+function releaseGrab() {
+  if (!isGrabbing) return;
+  const t = grabbedTarget;
+  if (t) {
+    if (t.type === 'npc') {
+      t.ref.state = 'down';
+      t.ref.downTimer = 0;
+      t.ref.downDuration = 2;
+      t.ref.pivot.rotation.x = Math.PI / 2;
+    } else {
+      t.ref.state = 'idle';
+      if (t.ref.collider) t.ref.collider.active = true;
+    }
+  }
+  isGrabbing = false;
+  grabbedTarget = null;
+  for (const seg of tongueSegs) seg.visible = false;
+}
+
+// ---- 物理 ----
+const velocity = { x: 0, z: 0 };
+let yVel = 0;
+const gravity = -25;
+const moveSpeed = 5;
+const jumpSpeed = 8.7;
+const groundY = 0;
+let isGrounded = true;
+
+// ---- 游戏循环 ----
+const clock = new THREE.Clock();
+let walkCycle = 0;
+let move = new THREE.Vector3();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  // 山羊平滑转向（按住Shift时锁定方向，纯转视角）
+  if (!keys.shift) {
+    const goatTargetAngle = cameraAzimuth + Math.PI;
+    let diff = goatTargetAngle - goat.rotation.y;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    goat.rotation.y += diff * Math.min(1, dt * 8);
+  }
+
+  // 倒地受击状态（被动：1.5s 强制 + 空格起立；主动：直接躺 + 空格起立）
+  if (isStunned) {
+    stunTimer += dt;
+    goat.rotation.x += (-1.3 - goat.rotation.x) * 0.15;
+    if (keys.space && stunTimer >= 1.5) { isStunned = false; stunTimer = 0; goat.rotation.x = 0; knockbackMult = 1; }
+  }
+  if (!isStunned) {
+  const goatForward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), goat.rotation.y);
+  move.set(0, 0, 0);
+  if (keys.w || keys.q) move.add(goatForward);
+  if (keys.s) move.sub(goatForward);
+  if (move.length() > 0) move.normalize();
+
+  const speedMul = keys.q ? 2 : 1;
+  velocity.x = move.x * moveSpeed * speedMul + dashVelX + chargeVelX;
+  velocity.z = move.z * moveSpeed * speedMul + dashVelZ + chargeVelZ;
+
+  if (isHeadbutting && headbuttTimer < HEADBUTT_FORWARD) {
+    velocity.x += dashVelX;
+    velocity.z += dashVelZ;
+  }
+
+  if (keys.space && isGrounded) {
+    yVel = jumpSpeed;
+    isGrounded = false;
+  }
+
+  } // 结束 !isStunned（输入相关代码结束）
+
+  if (isStunned) move.set(0, 0, 0);
+
+  // 衰减（倒地时也运行，倒地时衰减极快）
+  chargeVelX *= 0.93;
+  chargeVelZ *= 0.93;
+  if (Math.abs(chargeVelX) < 0.01) chargeVelX = 0;
+  if (Math.abs(chargeVelZ) < 0.01) chargeVelZ = 0;
+  if (isStunned) {
+    dashVelX *= 0.3; dashVelZ *= 0.3;
+  } else if (!isHeadbutting || headbuttTimer >= HEADBUTT_FORWARD) {
+    dashVelX *= 0.7; dashVelZ *= 0.7;
+  }
+
+  // 物理（倒地时仍然运行）
+  yVel += gravity * dt;
+  goat.position.y += yVel * dt;
+  if (goat.position.y <= groundY) {
+    goat.position.y = groundY;
+    yVel = 0;
+    isGrounded = true;
+  }
+
+  goat.position.x += velocity.x * dt;
+  goat.position.z += velocity.z * dt;
+
+  // 碰撞检测（场景实体）- 两轮防止穿墙
+  const GR = 0.35;
+  for (let iter = 0; iter < 2; iter++) {
+    for (const col of colliders) {
+      if (!col.active) continue;
+      const dx = goat.position.x - col.x;
+      const dz = goat.position.z - col.z;
+      const ox = col.hw + GR - Math.abs(dx);
+      const oz = col.hd + GR - Math.abs(dz);
+      if (ox > 0 && oz > 0) {
+        if (ox < oz) goat.position.x += Math.sign(dx) * ox;
+        else goat.position.z += Math.sign(dz) * oz;
+      }
+    }
+  }
+
+  // 头槌动画 + 碰撞
+  if (isHeadbutting) {
+    headbuttTimer += dt;
+    const total = HEADBUTT_FORWARD + HEADBUTT_BACK;
+    if (headbuttTimer >= total) {
+      headGroup.position.z = HEADGROUP_Z0;
+      isHeadbutting = false;
+    } else if (headbuttTimer < HEADBUTT_FORWARD) {
+      const t = headbuttTimer / HEADBUTT_FORWARD;
+      const offset = t * t * HEADBUTT_EXTEND;
+      headGroup.position.z = HEADGROUP_Z0 + offset;
+
+      if (!headbuttHit) {
+        const headWorld = new THREE.Vector3();
+        headMesh.getWorldPosition(headWorld);
+        for (const npc of npcs) {
+          const npcPos = npc.group.position;
+          const dx = headWorld.x - npcPos.x;
+          const dz = headWorld.z - npcPos.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+          if (dist < 3.5 && npc.state !== 'knocked' && npc.state !== 'grabbed') {
+            headbuttHit = true;
+            const ndx = npcPos.x - headWorld.x;
+            const ndz = npcPos.z - headWorld.z;
+            const ndist = Math.sqrt(ndx * ndx + ndz * ndz) || 1;
+            const chargeSpd = Math.sqrt(chargeVelX * chargeVelX + chargeVelZ * chargeVelZ);
+            const power = 10 + chargeSpd * 1.5;
+            npc.state = 'knocked';
+            npc.velX = (ndx / ndist) * power;
+            npc.velZ = (ndz / ndist) * power;
+            npc.velY = 5;
+            npc.downTimer = 0;
+            break;
+          }
+        }
+        // 撞物理物件
+        if (!headbuttHit) {
+          for (const obj of physObjects) {
+            if (obj.state === 'knocked' || obj.state === 'grabbed') continue;
+            const dx = headWorld.x - obj.pos.x;
+            const dz = headWorld.z - obj.pos.z;
+            if (Math.sqrt(dx*dx + dz*dz) < 3) {
+              headbuttHit = true;
+              if (obj === gasCanRef) {
+                // 煤气罐爆炸！
+                const expPos = obj.pos.clone();
+                obj.mesh.visible = false;
+                obj.collider.active = false;
+                obj.state = 'knocked';
+                createExplosion(expPos.x, 0.3, expPos.z);
+                // 爆炸冲击波 - 山羊被弹飞 + 倒地
+                const edx = goat.position.x - expPos.x;
+                const edz = goat.position.z - expPos.z;
+                const ed = Math.sqrt(edx*edx + edz*edz) || 1;
+                yVel = 6;
+                dashVelX += (edx/ed) * 12 * knockbackMult;
+                dashVelZ += (edz/ed) * 12 * knockbackMult;
+                isStunned = true;
+                stunTimer = 0;
+                // 爆炸也炸飞NPC
+                for (const npc of npcs) {
+                  if (npc.state === 'knocked') continue;
+                  const ndx = npc.group.position.x - expPos.x;
+                  const ndz = npc.group.position.z - expPos.z;
+                  const ndist = Math.sqrt(ndx*ndx + ndz*ndz);
+                  if (ndist < 5) {
+                    npc.state = 'knocked';
+                    npc.velX = (ndx / (ndist||1)) * 8;
+                    npc.velZ = (ndz / (ndist||1)) * 8;
+                    npc.velY = 4;
+                    npc.downTimer = 0;
+                  }
+                }
+                // 炸开所有门栏
+                for (const bar of gateBarsRef) {
+                  if (bar.broken) continue;
+                  bar.broken = true;
+                  bar.mesh.visible = false;
+                  bar.collider.active = false;
+                }
+              } else {
+                obj.state = 'knocked';
+                const nd = Math.sqrt(dx*dx + dz*dz) || 1;
+                const chargeSpd = Math.sqrt(chargeVelX ** 2 + chargeVelZ ** 2);
+                const power = 18 + chargeSpd * 2;
+                obj.velX = (-dx/nd) * power;
+                obj.velZ = (-dz/nd) * power;
+                obj.velY = 2 + chargeSpd * 0.3;
+              }
+              break;
+            }
+          }
+        }
+      }
+    } else {
+      const t = (headbuttTimer - HEADBUTT_FORWARD) / HEADBUTT_BACK;
+      const ease = 1 - (1 - t) * (1 - t);
+      headGroup.position.z = HEADGROUP_Z0 + (1 - ease) * HEADBUTT_EXTEND;
+    }
+  } else {
+    headGroup.position.z += (HEADGROUP_Z0 - headGroup.position.z) * 0.15;
+  }
+
+  // 行走动画
+  const isMoving = move.length() > 0;
+  if (isMoving && isGrounded) {
+    walkCycle += dt * 8;
+  } else if (!isGrounded) {
+    walkCycle += dt * 2;
+  } else {
+    walkCycle *= 0.9;
+  }
+  for (let i = 0; i < legs.length; i++) {
+    const phase = i < 2 ? 0 : Math.PI;
+    const swing = isMoving ? Math.sin(walkCycle + phase) * 0.2 : 0;
+    legs[i].rotation.x = swing;
+  }
+  body.position.y = 0.6 + (isMoving && isGrounded ? Math.abs(Math.sin(walkCycle * 0.5)) * 0.03 : 0);
+
+  // ---- NPC AI ----
+  for (const npc of npcs) {
+    if (npc.state === 'idle') {
+      npc.velY += gravity * dt;
+      npc.group.position.y += npc.velY * dt;
+      if (npc.group.position.y < 0) {
+        npc.group.position.y = 0;
+        npc.velY = 0;
+      }
+      npc.group.position.x += npc.velX * dt;
+      npc.group.position.z += npc.velZ * dt;
+      for (const col of colliders) {
+        if (!col.active) continue;
+        const dx = npc.group.position.x - col.x;
+        const dz = npc.group.position.z - col.z;
+        const ox = col.hw + 0.35 - Math.abs(dx);
+        const oz = col.hd + 0.35 - Math.abs(dz);
+        if (ox > 0 && oz > 0) {
+          if (ox < oz) npc.group.position.x += Math.sign(dx) * ox;
+          else npc.group.position.z += Math.sign(dz) * oz;
+        }
+      }
+      npc.velX *= 0.92;
+      npc.velZ *= 0.92;
+      if (Math.abs(npc.velX) < 0.01) npc.velX = 0;
+      if (Math.abs(npc.velZ) < 0.01) npc.velZ = 0;
+
+      if (npc.velX === 0 && npc.velZ === 0) {
+        npc.wanderTimer -= dt;
+        if (npc.wanderTimer <= 0) {
+          npc.isWalking = !npc.isWalking;
+          npc.wanderTimer = npc.isWalking ? 1.5 + Math.random() * 2 : 2 + Math.random() * 3;
+          if (npc.isWalking) {
+            npc.wanderAngle = Math.random() * Math.PI * 2;
+            npc.group.rotation.y = npc.wanderAngle;
+          }
+        }
+        if (npc.isWalking) {
+          const speed = 1.2;
+          npc.velX = Math.sin(npc.wanderAngle) * speed;
+          npc.velZ = Math.cos(npc.wanderAngle) * speed;
+        }
+      }
+
+      const margin = 35;
+      if (Math.abs(npc.group.position.x) > margin || Math.abs(npc.group.position.z) > margin) {
+        npc.wanderAngle += Math.PI;
+        npc.group.rotation.y = npc.wanderAngle;
+        npc.velX = Math.sin(npc.wanderAngle) * 1.2;
+        npc.velZ = Math.cos(npc.wanderAngle) * 1.2;
+      }
+    } else if (npc.state === 'knocked') {
+      npc.velY += gravity * dt;
+      npc.group.position.y += npc.velY * dt;
+      if (npc.group.position.y < 0) {
+        npc.group.position.y = 0;
+        npc.velY = 0;
+      }
+      npc.group.position.x += npc.velX * dt;
+      npc.group.position.z += npc.velZ * dt;
+      for (const col of colliders) {
+        if (!col.active) continue;
+        const dx = npc.group.position.x - col.x;
+        const dz = npc.group.position.z - col.z;
+        const ox = col.hw + 0.35 - Math.abs(dx);
+        const oz = col.hd + 0.35 - Math.abs(dz);
+        if (ox > 0 && oz > 0) {
+          if (ox < oz) npc.group.position.x += Math.sign(dx) * ox;
+          else npc.group.position.z += Math.sign(dz) * oz;
+        }
+      }
+      npc.velX *= 0.94;
+      npc.velZ *= 0.94;
+
+      npc.downTimer += dt;
+      npc.pivot.rotation.x = Math.min(npc.downTimer * 3, Math.PI / 2);
+
+      if (npc.group.position.y <= 0 && Math.abs(npc.velX) < 0.05 && Math.abs(npc.velZ) < 0.05) {
+        npc.state = 'down';
+        npc.downTimer = 0;
+        npc.downDuration = 4;
+        npc.velX = 0;
+        npc.velZ = 0;
+        npc.velY = 0;
+        npc.pivot.rotation.x = Math.PI / 2;
+      }
+    } else if (npc.state === 'down') {
+      npc.downTimer += dt;
+      if (npc.downTimer >= npc.downDuration) {
+        npc.state = 'getting_up';
+      }
+      npc.group.position.y = 0;
+      npc.velX = 0;
+      npc.velZ = 0;
+      npc.velY = 0;
+    } else if (npc.state === 'grabbed') {
+      npc.pivot.rotation.x = Math.PI / 2;
+      npc.velX = 0; npc.velZ = 0; npc.velY = 0;
+    } else if (npc.state === 'getting_up') {
+      npc.pivot.rotation.x -= dt * 2.5;
+      if (npc.pivot.rotation.x <= 0) {
+        npc.pivot.rotation.x = 0;
+        npc.state = 'idle';
+        npc.wanderTimer = 1 + Math.random() * 2;
+      }
+    }
+  }
+
+  // ---- 物理物件更新 ----
+  for (const obj of physObjects) {
+    if (obj.state === 'grabbed') continue;
+    if (!obj._visual && obj.mesh && !obj.mesh.visible) continue;
+    obj.velY += gravity * dt;
+    obj.pos.y += obj.velY * dt;
+    if (obj.pos.y < 0) { obj.pos.y = 0; obj.velY = 0; }
+    obj.pos.x += obj.velX * dt;
+    obj.pos.z += obj.velZ * dt;
+    obj.velX *= 0.97;
+    obj.velZ *= 0.97;
+    if (obj === gasCanRef) { obj.velX *= 0.97; obj.velZ *= 0.97; }
+    obj.collider.x = obj.pos.x;
+    obj.collider.z = obj.pos.z;
+    if (obj._visual) obj._visual.position.copy(obj.pos);
+    if (obj.state === 'knocked' && Math.abs(obj.velX) < 0.02 && Math.abs(obj.velZ) < 0.02) {
+      obj.state = 'idle';
+      obj.velX = 0; obj.velZ = 0; obj.velY = 0;
+    }
+  }
+
+  // 煤气罐撞破门栏
+  for (const bar of gateBarsRef) {
+    if (bar.broken) continue;
+    const dx = gasCanRef.pos.x - bar.mesh.position.x;
+    const dz = gasCanRef.pos.z - bar.mesh.position.z;
+    if (Math.abs(dx) < 0.5 && Math.abs(dz) < 0.5) {
+      const spd = Math.sqrt(gasCanRef.velX ** 2 + gasCanRef.velZ ** 2);
+      if (spd > 0.8) {
+        bar.broken = true;
+        bar.mesh.visible = false;
+        bar.collider.active = false;
+        gasCanRef.velX *= -0.2;
+        gasCanRef.velZ *= -0.2;
+      }
+    }
+  }
+
+  // 山羊碰撞推动物理物件
+  for (const obj of physObjects) {
+    if (obj.state === 'grabbed') continue;
+    const dx = goat.position.x - obj.pos.x;
+    const dz = goat.position.z - obj.pos.z;
+    const ox = 0.35 + obj.collider.hw - Math.abs(dx);
+    const oz = 0.35 + obj.collider.hd - Math.abs(dz);
+    if (ox > 0 && oz > 0) {
+      if (ox < oz) obj.pos.x -= Math.sign(dx) * ox * 0.3;
+      else obj.pos.z -= Math.sign(dz) * oz * 0.3;
+    }
+  }
+
+  // ---- 舌头拖拽 ----
+  if (isGrabbing && grabbedTarget) {
+    const mouthPos = new THREE.Vector3();
+    nose.getWorldPosition(mouthPos);
+    const npc = grabbedTarget.ref;
+    const pos = grabbedTarget.type === 'npc' ? npc.group.position : npc.pos;
+    const dx = mouthPos.x - pos.x;
+    const dz = mouthPos.z - pos.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    const speed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+    const maxGrab = 1.2 + speed * 0.5;
+    if (dist > maxGrab) {
+      const pull = (dist - maxGrab) / dist * 0.85;
+      pos.x += dx * pull;
+      pos.z += dz * pull;
+    }
+    pos.x += dx * dt * 6;
+    pos.z += dz * dt * 6;
+
+    const targetY = goat.position.y > 0.1 ? goat.position.y + 0.3 : 0;
+    pos.y += (targetY - pos.y) * 0.12;
+
+    // 同步可视化物件和碰撞体
+    if (npc._visual) npc._visual.position.copy(pos);
+    if (npc.collider) { npc.collider.x = pos.x; npc.collider.z = pos.z; }
+
+    for (let i = 0; i < tongueSegs.length; i++) {
+      const t = i / (tongueSegs.length - 1);
+      const sx = mouthPos.x + (pos.x - mouthPos.x) * t;
+      const sz = mouthPos.z + (pos.z - mouthPos.z) * t;
+      const sag = Math.sin(t * Math.PI) * 0.12;
+      const sy = mouthPos.y + (pos.y - mouthPos.y) * t - sag;
+      tongueSegs[i].position.set(sx, sy, sz);
+      tongueSegs[i].visible = true;
+      const s = 1 + Math.max(0, (dist - 0.5) * 0.2);
+      tongueSegs[i].scale.set(s, s, s);
+    }
+  } else {
+    for (const seg of tongueSegs) seg.visible = false;
+  }
+
+  // ---- 蓄力条 + 冷却 ----
+  if (isCharging) {
+    const elapsed = Math.min((performance.now() - chargeStart) / 1000, 3);
+    const filled = Math.min(Math.floor(elapsed) + 1, 3);
+    for (let i = 1; i <= 3; i++) {
+      const el = document.getElementById('cell' + i);
+      el.className = 'charge-cell' + (i <= filled ? ' filled' + i : '');
+    }
+  }
+  if (cooldownTimer > 0) {
+    cooldownTimer -= dt;
+    const pct = (cooldownTimer / cooldownDuration) * 100;
+    document.getElementById('cd-fill').style.width = pct + '%';
+    if (cooldownTimer <= 0) {
+      cooldownTimer = 0;
+      document.getElementById('cd-bar').style.display = 'none';
+    }
+  }
+
+  // 相机
+  const camX = Math.sin(cameraAzimuth) * Math.cos(cameraElevation) * camRadius;
+  const camY = Math.sin(cameraElevation) * camRadius;
+  const camZ = Math.cos(cameraAzimuth) * Math.cos(cameraElevation) * camRadius;
+  const targetCamPos = new THREE.Vector3(
+    goat.position.x + camX,
+    goat.position.y + camY,
+    goat.position.z + camZ
+  );
+  camera.position.lerp(targetCamPos, 0.06);
+  camera.lookAt(goat.position.x, goat.position.y + 0.5, goat.position.z);
+
+  // 爆炸粒子更新
+  for (let i = explosionParticles.length - 1; i >= 0; i--) {
+    const p = explosionParticles[i];
+    p.life -= dt;
+    if (p.life <= 0) { scene.remove(p.mesh); explosionParticles.splice(i, 1); continue; }
+    if (!p.isFlash && !p.isRing) {
+      p.mesh.position.x += p.vx * dt; p.mesh.position.z += p.vz * dt;
+      p.mesh.position.y += p.vy * dt; p.vy -= 10 * dt;
+      const s = Math.max(0.1, p.life);
+      p.mesh.scale.setScalar(s);
+    } else if (p.isRing) {
+      const s = 1 + (1 - p.life) * 5;
+      p.mesh.scale.set(s, s, s);
+      p.mesh.material.opacity = p.life;
+    } else {
+      const s = 1 + (1 - p.life) * 10;
+      p.mesh.scale.setScalar(s);
+      p.mesh.material.opacity = Math.max(0, p.life * 2);
+      p.mesh.material.transparent = true;
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

@@ -77,6 +77,13 @@ canvas{display:block}
 #blink-bot{position:fixed;bottom:-50%;left:0;right:0;height:50%;background:#000;z-index:60;transition:bottom 0.18s ease-in}
 #monologue-text{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:38px;z-index:55;pointer-events:none;display:none;text-shadow:2px 2px 6px rgba(0,0,0,0.8)}
 #space-hint{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);color:#ffd700;font-size:18px;z-index:5;pointer-events:none;display:none;text-shadow:1px 1px 3px rgba(0,0,0,0.8)}
+#inventory{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(30,30,30,0.95);border:2px solid #555;border-radius:12px;padding:16px;z-index:45;display:none}
+#inventory .grid{display:grid;grid-template-columns:repeat(3,80px);grid-template-rows:repeat(3,80px);gap:8px}
+#inventory .slot{width:80px;height:80px;background:rgba(255,255,255,0.06);border:2px solid rgba(255,255,255,0.15);border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;color:#ccc;transition:.2s;text-align:center;line-height:1.3}
+#inventory .slot:hover{border-color:#ffd700;background:rgba(255,215,0,0.1)}
+#inventory .slot.selected{border-color:#ffd700;background:rgba(255,215,0,0.25);box-shadow:0 0 12px rgba(255,215,0,0.4)}
+#inventory .slot .item-icon{font-size:28px}
+#inventory .inv-title{color:#ffd700;font-size:18px;text-align:center;margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -85,9 +92,9 @@ canvas{display:block}
 <div id="message"></div>
 <div id="crosshair">+</div>
 <div id="tooltip"></div>
-<div id="hint">WASD 行走 · 左键操作 · 右键丢食材 · 空格锁定 · V 设置 · T 订单</div>
+<div id="hint">WASD 行走 · 左键操作 · 右键丢食材 · Q 放回背包 · V 设置 · T 背包</div>
 <div id="total-earnings">💰 累计收入: 0元</div>
-<div id="order-paper"><div class="order-title">📋 今日订单</div><div class="order-content" id="order-content"></div><div class="order-hint">按 T 切换显示</div></div>
+<div id="order-paper"><div class="order-title">📋 今日订单</div><div class="order-content" id="order-content"></div></div>
 <div id="result-screen"><div id="result-text"></div><div id="result-money"></div></div>
 <div id="story-card"><div>这是我入职的第一天</div></div>
 <div id="day-hud"></div>
@@ -127,7 +134,7 @@ canvas{display:block}
     <span>R键</span>：对话界面中，确认切换下一句台词<br>
     <span>Z键</span>：隔着墙壁偷听两名顾客聊天<br>
     <span>V键</span>：打开游戏设置菜单<br>
-    <span>T键</span>：显示 / 隐藏顾客订单面板
+    <span>T键</span>：打开 / 关闭背包
   </div>
   <button onclick="closeTutorial()">关闭</button>
 </div>
@@ -137,6 +144,10 @@ canvas{display:block}
     <button class="yes" id="confirm-yes">是</button>
     <button id="confirm-no">否</button>
   </div>
+</div>
+<div id="inventory">
+  <div class="inv-title">🎒 背包</div>
+  <div class="grid" id="inv-grid"></div>
 </div>
 <div id="save-list">
   <div class="sltitle">📁 存档列表</div>
@@ -473,6 +484,11 @@ var G = {
   redLight: null,
   redCylinder: null,
   fryerOil: null,
+  inventory: [null,null,null,null,null,null,null,null,null],
+  invOpen: false,
+  invSel: 0,
+  circuitBoard: null,
+  circuitBoardFound: false,
   currentSaveKey: null,
   handlersInit: false,
   doorPiv: null, divPiv: null,
@@ -526,7 +542,11 @@ function mkCount(parent, w, d, c) {
 }
 
 function pickUp(m) {
-  if (G.carried) { msg('先丢掉手里的东西'); return false; }
+  if (G.carried) {
+    if (G.carried.userData.type === 'combo') { msg('先丢掉套餐'); return false; }
+    if (!storeToInv(G.carried)) { msg('背包已满'); return false; }
+    G.carried = null;
+  }
   G.carried = m;
   m.userData.canPickup = 0;
   var idx = G.loose.indexOf(m);
@@ -580,6 +600,7 @@ function getSaveData() {
   var d={
     day:G.day,phase:G.phase,money:G.money,eavesdropped:G.eavesdropped,
     oldManTalked:G.oldManTalked,cutsceneDone:G.cutsceneDone,
+    circuitBoardFound:G.circuitBoardFound,
     px:G.camera.position.x,py:G.camera.position.y,pz:G.camera.position.z,yaw:G.yaw,pitch:G.pitch,
     carried:serializeItem(G.carried),
     dOpen:G.dOpen,rdOpen:G.rdOpen||false,
@@ -663,6 +684,8 @@ function createTrayObject(){
 function restoreGState(data){
   G.day=data.day||1;G.money=data.money||0;G.eavesdropped=data.eavesdropped||false;
   G.oldManTalked=data.oldManTalked||false;G.cutsceneDone=data.cutsceneDone||false;
+  G.circuitBoardFound=data.circuitBoardFound||false;
+  if(G.circuitBoardFound && G.circuitBoard) { G.scene.remove(G.circuitBoard); G.circuitBoard = null; }
   G.camera.position.set(data.px||0,data.py||1.7,data.pz||4.5);G.yaw=data.yaw||0;G.pitch=data.pitch||0;
   G.dOpen=data.dOpen||false;G.rdOpen=data.rdOpen||false;
   G.restActive=data.restActive||false;G.restInfinite=data.restInfinite||false;G.restTimer=data.restTimer||0;
@@ -833,6 +856,10 @@ function newGame() {
   G.eavesdropped = false;
   G.oldManTalked = false;
   G.cutsceneDone = false;
+  G.inventory = [null,null,null,null,null,null,null,null,null];
+  G.invOpen = false;
+  G.invSel = 0;
+  G.circuitBoardFound = false;
   G.settingsOpen = false;
   G.currentSaveKey = key;
   document.getElementById('space-hint').style.display = 'none';
@@ -932,6 +959,8 @@ function returnToMenu() {
   if(G.redCylinder){G.scene.remove(G.redCylinder);G.redCylinder=null;}
   var bov=document.getElementById('blink-overlay');if(bov)bov.parentNode.removeChild(bov);
   G.oldManTalked=false;G.cutscene=null;G.cutsceneDone=false;
+  G.inventory=[null,null,null,null,null,null,null,null,null];G.invOpen=false;G.invSel=0;
+  G.circuitBoardFound=false;
 }
 
 function showConfirm(msgText, onYes, singleButton) {
@@ -1315,6 +1344,56 @@ function startGame() {
     S.add(tG); mkZone(tG, 0.5, 0.5, 0.5, 0.3);
       coll(7.2, 7.8, -0.75, -0.25);
 
+     // Corner trash pile - multiple cube-like boxes stacked irregularly
+     function makeTrashBag(x, z) {
+       var g = new THREE.Group(); g.position.set(x, 0, z);
+       var bagMat = new THREE.MeshStandardMaterial({ color: 0x0e0e0e, roughness: 0.95 });
+       var bags = [
+         { w:0.65, h:0.55, d:0.7, x:0, y:0.28, z:0, ry:0 },
+         { w:0.7, h:0.55, d:0.6, x:0.2, y:0.6, z:-0.12, ry:0.25 },
+         { w:0.55, h:0.7, d:0.65, x:-0.15, y:0.33, z:0.2, ry:-0.18 },
+         { w:0.6, h:0.65, d:0.55, x:0.12, y:0.55, z:0.18, ry:0.12 },
+         { w:0.7, h:0.45, d:0.65, x:-0.08, y:0.2, z:-0.15, ry:-0.3 }
+       ];
+       for (var bi=0; bi<bags.length; bi++) {
+         var b = bags[bi];
+         var box = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), bagMat);
+         box.position.set(b.x, b.y, b.z); box.rotation.y = b.ry;
+         g.add(box);
+         for (var pi=0; pi<3; pi++) {
+           var sc = new THREE.Mesh(new THREE.BoxGeometry(0.04+Math.random()*0.05, 0.01, 0.04+Math.random()*0.05), new THREE.MeshStandardMaterial({ color: 0xb8aa90, roughness: 0.9 }));
+           sc.position.set(b.x+(Math.random()-0.5)*b.w*0.8, b.y+b.h*0.4+Math.random()*0.1, b.z+(Math.random()-0.5)*b.d*0.8); g.add(sc);
+         }
+       }
+       return g;
+     }
+     var tbG1 = makeTrashBag(6, 3.5); var tbG2 = makeTrashBag(5.25, 3.5);
+     S.add(tbG1); S.add(tbG2);
+     // Spider web from wall corner spanning both bags
+     var webMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 1, transparent: true, opacity: 0.35 });
+     for (var wi=0; wi<14; wi++) {
+       var sx = 7.0 + Math.random()*0.2;
+       var sy = 0.3 + Math.random()*0.9;
+       var sz = 3.3 + Math.random()*0.6;
+       var ex = 5.2 + Math.random()*0.8;
+       var ey = 0.1 + Math.random()*0.5;
+       var ez = 3.3 + (Math.random()-0.3)*0.8;
+       var dx = ex-sx, dy = ey-sy, dz = ez-sz;
+       var len = Math.sqrt(dx*dx+dy*dy+dz*dz);
+       var wc = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, len, 4), webMat);
+       wc.position.set((sx+ex)/2, (sy+ey)/2, (sz+ez)/2);
+       var dir = new THREE.Vector3(dx, dy, dz).normalize();
+       wc.setRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), dir));
+       S.add(wc);
+     }
+     // Circuit board flat on ground underneath bags
+     var cbG = new THREE.Group(); cbG.position.set(5.5, 0, 3.5);
+     var cbMat = new THREE.MeshStandardMaterial({ color: 0x1a5c1a, roughness: 0.6, emissive: 0x003300, emissiveIntensity: 0.5 });
+     var cb = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.02, 0.1), cbMat); cb.position.y = 0.01; cbG.add(cb);
+     G.circuitBoard = cbG; G.circuitBoardFound = false;
+     S.add(cbG);
+     coll(4.8, 7, 3.0, 4.2, 'bagCol');
+
      // Day 3+ NPC pair and old man (independent of spawnCustomers)
      if (G.day >= 3 && !G.npcA) {
        G.npcA = makeNPC(4, -6.8, 0, 0x8888ff);
@@ -1339,6 +1418,10 @@ function startGame() {
       if (k === ' ' && G.locked && G.restActive && !G.restInfinite) { endRestTime(); return; }
       if (k === ' ' && G.restActive && document.getElementById('space-hint').style.display === 'block') { endRestTime(); return; }
       if (k === ' ' && G.locked && G.phase === 'playing') G.renderer.domElement.requestPointerLock();
+      if (G.invOpen) {
+        if (k === 't') { G.invOpen = false; G.paused = false; document.getElementById('inventory').style.display='none'; setTimeout(function(){G.renderer.domElement.requestPointerLock();},100); return; }
+        return;
+      }
       if (k === 'v' && G.init) { if (!G.settingsOpen) openSettings(); else closeSettings(); return; }
       if (k === 'r' && G.paused && chatting) {
         if (skipType) { skipType(); return; }
@@ -1439,9 +1522,17 @@ function startGame() {
           }
         }
       }
-      if (k === 't' && G.phase === 'playing') {
-        var p = document.getElementById('order-paper');
-        p.style.display = p.style.display === 'none' ? 'block' : 'none';
+      if (k === 't' && G.init && !G.paused && !G.settingsOpen) {
+        G.invOpen = !G.invOpen;
+        if (G.invOpen) {
+          G.paused = true;
+          if (document.pointerLockElement) document.exitPointerLock();
+          buildInvUI();
+        } else {
+          G.paused = false; document.getElementById('inventory').style.display='none';
+          setTimeout(function() { G.renderer.domElement.requestPointerLock(); }, 100);
+        }
+        return;
       }
       if (k === 'f') {
         if (G.camera.position.distanceTo(new THREE.Vector3(-6.5, 0, 3.2)) < 2.5) getDrink('right');
@@ -1455,7 +1546,11 @@ function startGame() {
           }
         }
       }
-      if (k === 'q' && G.carried) { var isCombo = G.carried.userData.type === 'combo'; dropIt(); msg(isCombo ? '丢掉套餐' : '丢掉食材'); }
+      if (k === 'q' && G.carried) { 
+        if (G.carried.userData.type === 'combo') { dropIt(); msg('丢掉套餐'); }
+        else if (storeToInv(G.carried)) { G.carried = null; msg('放回背包'); }
+        else { msg('背包已满'); }
+      }
     });
 
     document.addEventListener('keyup', function(e) { G.keys[e.key.toLowerCase()] = false; });
@@ -1606,6 +1701,68 @@ function updateCutscene(dt) {
   }
 }
 
+// === INVENTORY SYSTEM ===
+var ITEM_ICONS = {steak:'🥩',egg:'🥚',lettuce:'🥬',fries:'🍟',bun:'🍞',ketchup:'🥫',mustard:'🟡',cola:'🥤',sprite:'🧃',tray:'📦',burger:'🍔',combo:'📦',circuit:'💚'};
+var ITEM_NAMES = {steak:'牛排',egg:'鸡蛋',lettuce:'生菜',fries:'薯条',ketchup:'番茄酱',mustard:'芥末酱',cola:'可乐',sprite:'雪碧',tray:'托盘',burger:'汉堡',combo:'套餐',circuit:'电路板'};
+
+function buildInvUI() {
+  var grid = document.getElementById('inv-grid'); grid.innerHTML = '';
+  for (var i = 0; i < 9; i++) {
+    (function(idx) {
+      var slot = document.createElement('div'); slot.className = 'slot';
+      var item = G.inventory[idx];
+      if (item) {
+        slot.innerHTML = '<div class="item-icon">' + (ITEM_ICONS[item.type] || '📦') + '</div>' + (ITEM_NAMES[item.type] || item.type);
+        slot.onclick = function() { equipFromInv(idx); };
+      } else {
+        slot.onclick = function() { closeInv(); };
+      }
+      grid.appendChild(slot);
+    })(i);
+  }
+  document.getElementById('inventory').style.display = 'block';
+}
+
+function equipFromInv(idx) {
+  var item = G.inventory[idx];
+  if (!item) { closeInv(); return; }
+  if (G.carried) {
+    var freeIdx = invFindFree();
+    if (freeIdx < 0) { msg('背包已满'); return; }
+    G.inventory[freeIdx] = serializeItem(G.carried);
+    G.scene.remove(G.carried); G.carried = null;
+  }
+  G.inventory[idx] = null;
+  var m = mkItem(item.type, item.state);
+  if (m) {
+    if (item.recipe) m.userData.recipe = item.recipe.slice();
+    if (item.isTop !== undefined) m.userData.isTop = item.isTop;
+    m.userData.canPickup = 0;
+    G.carried = m;
+  }
+  closeInv();
+}
+
+function invFindFree() {
+  for (var i = 0; i < 9; i++) { if (G.inventory[i] === null) return i; }
+  return -1;
+}
+
+function closeInv() {
+  document.getElementById('inventory').style.display = 'none';
+  G.invOpen = false; G.paused = false;
+  setTimeout(function() { G.renderer.domElement.requestPointerLock(); }, 100);
+}
+
+function storeToInv(m) {
+  if (!m || !m.userData) return false;
+  var idx = invFindFree();
+  if (idx < 0) { msg('背包已满'); return false; }
+  G.inventory[idx] = serializeItem(m);
+  G.scene.remove(m);
+  return true;
+}
+
 // Animation loop
 function animate() {
   if (!G.clock) return;
@@ -1718,6 +1875,12 @@ function animate() {
     document.getElementById('talk-hint').style.display = hitsCrosshair ? 'block' : 'none';
   }
 
+  // Circuit board glow
+  if (G.circuitBoard && !G.circuitBoardFound && G.camera.position.distanceTo(G.circuitBoard.position) < 3) {
+    var glow = 0.3 + Math.sin(performance.now() * 0.003) * 0.15 + 0.15;
+    G.circuitBoard.children.forEach(function(c) { if (c.material && c.material.emissiveIntensity !== undefined) c.material.emissiveIntensity = glow; });
+  }
+
   // Station interaction hints (tooltip below crosshair)
   if (!G.paused && G.init) {
     var stationHints = [
@@ -1736,7 +1899,8 @@ function animate() {
       { x: -6.5, z: 0.8, r: 0.35, label: '底层面包食物柜' },
       { x: -6.5, z: 2, r: 0.35, label: '顶层面包食物柜' },
       { x: -10.08, z: 1.1, r: 1.5, label: '按下F推开洗手间房门' },
-      { x: 7.5, z: -0.5, r: 0.4, label: '垃圾桶' }
+      { x: 7.5, z: -0.5, r: 0.4, label: '垃圾桶' },
+      { x: 5.6, z: 3.5, r: 1.0, label: '垃圾袋' }
     ];
     var px = G.camera.position.x, pz = G.camera.position.z;
     var bestDist = Infinity, bestLabel = '', bestIdx = -1, tie = false;

@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🍔 汉堡工坊</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    background: linear-gradient(160deg, #fff3e0 0%, #ffe3c9 50%, #ffd9b3 100%);
+    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    overflow: hidden;
+  }
+  body {
+    display: flex; align-items: center; justify-content: center;
+  }
+  .stage {
+    position: relative;
+    width: min(1000px, 100vw, calc(100vh * 1000 / 620));
+    aspect-ratio: 1000 / 620;
+    box-shadow: 0 24px 80px rgba(176, 110, 46, 0.35);
+    border-radius: 24px;
+    overflow: hidden;
+  }
+  canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <canvas id="game"></canvas>
+</div>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const W = 1000, H = 620;
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ---------------- 素材 ---------------- */
+const INGREDIENTS = {
+  topBun:   { name: '上层面包', emoji: '🍞', color: '#e9b25f' },
+  patty:    { name: '牛肉饼',   emoji: '🥩', color: '#8b5a2b' },
+  cheese:   { name: '芝士',     emoji: '🧀', color: '#f7c948' },
+  lettuce:  { name: '生菜',     emoji: '🥬', color: '#7ec850' },
+  tomato:   { name: '番茄',     emoji: '🍅', color: '#ef5b52' },
+  bacon:    { name: '培根',     emoji: '🥓', color: '#c96a52' },
+  onion:    { name: '洋葱圈',   emoji: '🧅', color: '#e8c9a8' },
+  pickle:   { name: '酸黄瓜',   emoji: '🥒', color: '#7fb069' },
+  egg:      { name: '鸡蛋',     emoji: '🍳', color: '#f6e27a' },
+  bottomBun:{ name: '下层面包', emoji: '🍞', color: '#e0a452' },
+};
+const MID_KEYS = ['patty','cheese','lettuce','tomato','bacon','onion','pickle','egg'];
+
+const DIFFICULTIES = {
+  easy:   { key: 'easy',   name: '初级', emoji: '🌱', desc: '菜谱可见 · 基础搭配', min: 3, max: 4, time: 40, peek: Infinity },
+  medium: { key: 'medium', name: '中级', emoji: '🍀', desc: '菜谱计时 · 更多配料', min: 5, max: 6, time: 32, peek: 6 },
+  hard:   { key: 'hard',   name: '高级', emoji: '🔥', desc: '超快手速 · 记忆挑战', min: 7, max: 9, time: 26, peek: 4 },
+};
+const CUSTOMERS = ['👩','🧑','👨','👵','👴','🧒','👩🦰','👨🦱','👧','👦','👱‍♀️','🧔'];
+
+const FLOATERS = ['🍔','🍟','🥤','🍦','🧁','🍩'];
+
+/* ---------------- 音频 ---------------- */
+let audioCtx = null;
+function beep(freq, dur, type = 'sine', vol = 0.15, when = 0) {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, audioCtx.currentTime + when);
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + when + dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(audioCtx.currentTime + when);
+    o.stop(audioCtx.currentTime + when + dur);
+  } catch (e) {}
+}
+const sfx = {
+  click: () => beep(660, 0.06, 'triangle', 0.12),
+  add:   () => { beep(520, 0.08, 'triangle', 0.14); beep(780, 0.08, 'triangle', 0.12, 0.05); },
+  remove:() => beep(320, 0.08, 'triangle', 0.12),
+  serve: () => { beep(523,0.1,'sine',0.16); beep(659,0.1,'sine',0.16,0.08); beep(784,0.14,'sine',0.16,0.16); },
+  wrong: () => { beep(220, 0.18, 'sawtooth', 0.12); beep(180, 0.22, 'sawtooth', 0.12, 0.1); },
+  over:  () => { [392,330,262,196].forEach((f,i)=>beep(f,0.22,'sine',0.14,i*0.16)); },
+  win:   () => { [523,659,784,1047].forEach((f,i)=>beep(f,0.16,'sine',0.14,i*0.1)); },
+};
+
+/* ---------------- 游戏状态 ---------------- */
+let screen = 'menu'; // menu | select | play | over
+let diff = null;
+let recipe = [];       // 目标
+let built = [];        // 已放配料
+let score = 0;
+let combo = 0;         // 连续成功
+let bestCombo = 0;
+let hearts = 3;
+let customerIdx = 0;
+let wave = 1;
+let served = 0;
+let timeLeft = 0;
+let cardFlipped = false;
+let flipTimer = 0;
+let highScores = { easy: 0, medium: 0, hard: 0 };
+try { highScores = JSON.parse(localStorage.getItem('burgerWorkshopHS')) || highScores; } catch (e) {}
+
+let particles = [];
+let floaters = [];
+let shake = 0;
+let msg = null; // 浮动提示
+
+const btns = {}; // 当前按钮热区
+const hoverKey = { current: null };
+let mousePos = { x: -100, y: -100 };
+
+/* ---------------- 工具 ---------------- */
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function ri(a, b) { return Math.floor(rnd(a, b + 1)); }
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function makeRecipe() {
+  const d = DIFFICULTIES[diff];
+  const n = ri(d.min, d.max);
+  const mid = [];
+  for (let i = 0; i < n - 2; i++) mid.push(MID_KEYS[ri(0, MID_KEYS.length - 1)]);
+  return ['topBun', ...mid, 'bottomBun'];
+}
+
+function newCustomer() {
+  recipe = makeRecipe();
+  built = [];
+  cardFlipped = false;
+  flipTimer = DIFFICULTIES[diff].peek;
+  timeLeft = DIFFICULTIES[diff].time;
+  customerIdx = ri(0, CUSTOMERS.length - 1);
+}
+
+function startGame(k) {
+  diff = k;
+  score = 0; combo = 0; bestCombo = 0; hearts = 3; wave = 1; served = 0;
+  particles = []; msg = null;
+  newCustomer();
+  screen = 'play';
+  sfx.click();
+}
+
+function addIngredient(key) {
+  built.push(key);
+  sfx.add();
+  spawnParticle(W/2 + 120, 330, '✨', 6);
+}
+
+function serve() {
+  const same = built.length === recipe.length && built.every((k, i) => k === recipe[i]);
+  if (same) {
+    combo++;
+    bestCombo = Math.max(bestCombo, combo);
+    const mult = Math.min(combo, 8);
+    const timeBonus = Math.floor(timeLeft) * 2;
+    const gained = 100 + mult * 20 + timeBonus;
+    score += gained;
+    served++;
+    sfx.serve();
+    spawnText('+' + gained, '#ff8a3d', 320);
+    burst(W/2, 330, ['🎉','⭐','🍔','💛'], 18);
+    if (served % 5 === 0) { wave++; sfx.win(); spawnText('第 ' + wave + ' 波！', '#e25b2e', 180); }
+    newCustomer();
+  } else {
+    combo = 0;
+    hearts--;
+    shake = 14;
+    sfx.wrong();
+    spawnText(built.length > recipe.length ? '配料多了！' : '配料不对！', '#d64545', 200);
+    if (hearts <= 0) { gameOver(); }
+    else { newCustomer(); }
+  }
+}
+
+function gameOver() {
+  screen = 'over';
+  sfx.over();
+  if (score > highScores[diff]) {
+    highScores[diff] = score;
+    try { localStorage.setItem('burgerWorkshopHS', JSON.stringify(highScores)); } catch (e) {}
+  }
+}
+
+function spawnText(t, color, y) {
+  msg = { t, color, y, life: 1 };
+}
+function spawnParticle(x, y, emoji, n) {
+  for (let i = 0; i < n; i++) {
+    particles.push({ x, y, vx: rnd(-2, 2), vy: rnd(-3, -0.5), life: rnd(0.5, 1.1), emoji, g: 0.08, size: rnd(14, 26) });
+  }
+}
+function burst(x, y, list, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = rnd(2, 7);
+    particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1, life: rnd(0.6, 1.2), emoji: list[ri(0, list.length - 1)], g: 0.12, size: rnd(16, 28) });
+  }
+}
+
+/* ---------------- 布局热区 ---------------- */
+function trayRects() {
+  const rects = {};
+  const keys = Object.keys(INGREDIENTS);
+  const startY = 512;
+  const totalW = 900;
+  const x0 = (W - totalW) / 2;
+  const gap = 8;
+  const cw = (totalW - gap * (keys.length - 1)) / keys.length;
+  const ch = 62;
+  keys.forEach((k, i) => {
+    rects[k] = { x: x0 + i * (cw + gap), y: startY, w: cw, h: ch };
+  });
+  return rects;
+}
+
+function gameButtons() {
+  return {
+    back: { x: 18, y: 16, w: 92, h: 40 },
+    serve: { x: 826, y: 286, w: 150, h: 52 },
+    undo:  { x: 826, y: 348, w: 150, h: 46 },
+  };
+}
+
+function hitTest(rects, x, y) {
+  for (const k in rects) {
+    const r = rects[k];
+    if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return k;
+  }
+  return null;
+}
+
+/* ---------------- 绘制 ---------------- */
+function drawBackground() {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#ffedd3');
+  g.addColorStop(1, '#ffd9ae');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+  // 格子桌布
+  ctx.save();
+  ctx.globalAlpha = 0.05;
+  ctx.strokeStyle = '#a0602a';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 50) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 50) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  ctx.restore();
+}
+
+function drawFloaters(dt) {
+  if (Math.random() < 0.02) {
+    floaters.push({ x: rnd(0, W), y: H + 30, vy: rnd(40, 90), emoji: FLOATERS[ri(0, FLOATERS.length - 1)], size: rnd(18, 34) });
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) {
+    const f = floaters[i];
+    f.y -= f.vy * dt;
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.font = f.size + 'px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(f.emoji, f.x, f.y);
+    ctx.restore();
+    if (f.y < -40) floaters.splice(i, 1);
+  }
+}
+
+function button(key, x, y, w, h, label, fg, bg, fontSize = 18) {
+  const r = 14;
+  const hovered = hoverKey.current === key;
+  ctx.save();
+  ctx.shadowColor = 'rgba(120,70,20,0.25)';
+  ctx.shadowBlur = hovered ? 14 : 6;
+  ctx.shadowOffsetY = hovered ? 2 : 3;
+  roundRect(x, y, w, h, r);
+  ctx.fillStyle = hovered ? shade(bg, -12) : bg;
+  ctx.fill();
+  ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+  if (hovered) {
+    roundRect(x, y, w, h, r);
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  ctx.fillStyle = fg;
+  ctx.font = `bold ${fontSize}px "PingFang SC", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x + w / 2, y + h / 2 + 1);
+  ctx.restore();
+  return { x, y, w, h };
+}
+
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  let r = (n >> 16) + amt, g = ((n >> 8) & 0xff) + amt, b = (n & 0xff) + amt;
+  r = Math.max(0, Math.min(255, r)); g = Math.max(0, Math.min(255, g)); b = Math.max(0, Math.min(255, b));
+  return `rgb(${r},${g},${b})`;
+}
+
+function drawHearts() {
+  const icons = ['❤️','❤️','❤️'];
+  ctx.font = '24px serif';
+  ctx.textAlign = 'left';
+  icons.forEach((_, i) => {
+    const on = i < hearts;
+    ctx.globalAlpha = on ? 1 : 0.2;
+    ctx.fillText(on ? '❤️' : '🤍', 20 + i * 32, 46);
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawHUD() {
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#7a4a1e';
+  ctx.font = 'bold 22px "PingFang SC", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('🍔 汉堡工坊', 130, 36);
+
+  // 分数
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#e25b2e';
+  ctx.font = 'bold 24px "PingFang SC", sans-serif';
+  ctx.fillText('⭐ ' + score, W - 20, 36);
+
+  // 波数
+  ctx.font = '14px "PingFang SC", sans-serif';
+  ctx.fillStyle = '#a06a34';
+  ctx.fillText('第 ' + wave + ' 波 · 已接单 ' + served + ' 单', W - 20, 60);
+
+  // 连击
+  if (combo >= 2) {
+    ctx.font = 'bold 18px "PingFang SC", sans-serif';
+    ctx.fillStyle = '#ff7a1f';
+    ctx.fillText('🔥 连击 x' + Math.min(combo, 8), W - 20, 84);
+  }
+  drawHearts();
+}
+
+function drawOrderCard() {
+  const cx = W / 2 - 160;
+  const cardW = 320, cardH = 120;
+  const x = cx, y = 88;
+  ctx.save();
+  ctx.shadowColor = 'rgba(120,70,20,0.20)';
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetY = 4;
+  roundRect(x, y, cardW, cardH, 18);
+  ctx.fillStyle = '#fffdf8';
+  ctx.fill();
+  ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+  // 顾客
+  ctx.font = '44px serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(CUSTOMERS[customerIdx], x + 20, y + 60);
+  ctx.fillStyle = '#7a4a1e';
+  ctx.font = 'bold 15px "PingFang SC", sans-serif';
+  ctx.fillText('顾客点单', x + 76, y + 26);
+
+  // 菜谱
+  const cardFlipProgress = !isFinite(DIFFICULTIES[diff].peek) ? 0 : Math.max(0, flipTimer / DIFFICULTIES[diff].peek);
+  const chipSize = 30, gap = 5;
+  const total = recipe.length;
+  const avail = (cardW - 76 - 30);
+  const cs = Math.min(chipSize, (avail - gap * (total - 1)) / total);
+  const startX = x + 76;
+  for (let i = 0; i < total; i++) {
+    const px = startX + i * (cs + gap);
+    const py = y + (cardH - cs) / 2 + 6;
+    if (!cardFlipped) {
+      const ing = INGREDIENTS[recipe[i]];
+      ctx.save();
+      roundRect(px, py, cs, cs, 8);
+      ctx.fillStyle = ing.color;
+      ctx.fill();
+      ctx.font = (cs - 6) + 'px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(ing.emoji, px + cs / 2, py + cs / 2 + 1);
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      roundRect(px, py, cs, cs, 8);
+      ctx.fillStyle = '#e8dfd2';
+      ctx.fill();
+      ctx.fillStyle = '#a08a6a';
+      ctx.font = 'bold ' + (cs - 6) + 'px "PingFang SC", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('?', px + cs / 2, py + cs / 2 + 1);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+
+  // 提示
+  if (cardFlipped) {
+    ctx.fillStyle = 'rgba(160,106,52,0.7)';
+    ctx.font = '13px "PingFang SC", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('菜谱已收起，凭记忆出餐！', x + cardW / 2, y + cardH + 18);
+  } else if (isFinite(DIFFICULTIES[diff].peek)) {
+    ctx.fillStyle = 'rgba(160,106,52,0.6)';
+    ctx.font = '13px "PingFang SC", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('菜谱将在 ' + Math.ceil(flipTimer) + ' 秒后收起', x + cardW / 2, y + cardH + 18);
+  }
+}
+
+function drawBurgerPlate() {
+  const px = 560, py = 210, pw = 220, ph = 250;
+  ctx.save();
+  ctx.shadowColor = 'rgba(120,70,20,0.18)';
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 5;
+  roundRect(px, py, pw, ph, 22);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = 'rgba(180,140,90,0.35)';
+  ctx.lineWidth = 2;
+  roundRect(px, py, pw, ph, 22);
+  ctx.stroke();
+
+  ctx.fillStyle = '#8a6232';
+  ctx.font = 'bold 16px "PingFang SC", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('你的汉堡', px + pw / 2, py + 24);
+
+  // 碟子
+  ctx.fillStyle = '#f2ead9';
+  ctx.beginPath();
+  ctx.ellipse(px + pw / 2, py + ph - 26, 70, 16, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (built.length === 0) {
+    ctx.globalAlpha = 0.45;
+    ctx.font = '22px serif';
+    ctx.fillText('🍽️', px + pw / 2, py + ph - 60);
+    ctx.font = '14px "PingFang SC", sans-serif';
+    ctx.fillText('从下方选择配料开始制作', px + pw / 2, py + ph - 32);
+    ctx.globalAlpha = 1;
+    return;
+  }
+
+  // 从下往上堆
+  const chipH = 30, chipGap = 4;
+  const total = built.length;
+  const startY = py + ph - 52 - total * (chipH + chipGap) - 8;
+  for (let i = 0; i < total; i++) {
+    const ing = INGREDIENTS[built[i]];
+    const cy = startY + (total - 1 - i) * (chipH + chipGap);
+    ctx.save();
+    roundRect(px + 30, cy, pw - 60, chipH, 9);
+    ctx.fillStyle = ing.color;
+    ctx.fill();
+    ctx.font = (chipH - 8) + 'px serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ing.emoji, px + 40, cy + chipH / 2 + 1);
+    ctx.font = '13px "PingFang SC", sans-serif';
+    ctx.fillStyle = '#5a3a15';
+    ctx.textAlign = 'right';
+    ctx.fillText(ing.name, px + pw - 40, cy + chipH / 2 + 1);
+    ctx.restore();
+  }
+}
+
+function drawTimerBar() {
+  const total = DIFFICULTIES[diff].time;
+  const frac = Math.max(0, timeLeft / total);
+  const x = 40, y = 246, w = 440, h = 16;
+  ctx.save();
+  roundRect(x, y, w, h, 8);
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.fill();
+  const g = ctx.createLinearGradient(x, 0, x + w, 0);
+  g.addColorStop(0, frac > 0.5 ? '#7ec850' : frac > 0.25 ? '#f7c948' : '#ef5b52');
+  g.addColorStop(1, frac > 0.5 ? '#5aa838' : frac > 0.25 ? '#e0a43a' : '#d64545');
+  if (frac > 0) {
+    roundRect(x + 3, y + 3, (w - 6) * frac, h - 6, 6);
+    ctx.fillStyle = g;
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.fillStyle = '#7a4a1e';
+  ctx.font = 'bold 14px "PingFang SC", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('⏱ ' + Math.max(0, Math.ceil(timeLeft)) + 's', x, y + h + 18);
+}
+
+function drawTray() {
+  const rects = trayRects();
+  const keys = Object.keys(INGREDIENTS);
+  keys.forEach((k) => {
+    const r = rects[k];
+    const ing = INGREDIENTS[k];
+    const hovered = hoverKey.current === k;
+    ctx.save();
+    ctx.shadowColor = 'rgba(120,70,20,0.18)';
+    ctx.shadowBlur = hovered ? 12 : 5;
+    ctx.shadowOffsetY = hovered ? 2 : 3;
+    roundRect(r.x, r.y, r.w, r.h, 14);
+    ctx.fillStyle = hovered ? '#fff7ea' : '#fffdf8';
+    ctx.fill();
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    ctx.font = '26px serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ing.emoji, r.x + 10, r.y + r.h / 2);
+    ctx.fillStyle = '#5a3a15';
+    ctx.font = '13px "PingFang SC", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(ing.name, r.x + 46, r.y + r.h / 2 + 1);
+    ctx.restore();
+  });
+}
+
+function drawParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    p.vy += p.g;
+    p.x += p.vx; p.y += p.vy;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, p.life * 2);
+    ctx.font = p.size + 'px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(p.emoji, p.x, p.y);
+    ctx.restore();
+  }
+}
+
+function drawMsg(dt) {
+  if (!msg) return;
+  msg.life -= dt * 0.7;
+  if (msg.life <= 0) { msg = null; return; }
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, msg.life);
+  ctx.fillStyle = msg.color;
+  ctx.font = 'bold 34px "PingFang SC", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(255,255,255,0.8)';
+  ctx.shadowBlur = 8;
+  ctx.fillText(msg.t, W / 2, msg.y + (1 - msg.life) * 30);
+  ctx.restore();
+}
+
+/* ---------- 菜单 / 选关 / 结算 ---------- */
+function drawMenu() {
+  drawBackground(); drawFloaters(0.016);
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '70px serif';
+  ctx.fillText('🍔', W / 2, 170);
+  ctx.font = 'bold 54px "PingFang SC", sans-serif';
+  ctx.fillStyle = '#6b3f16';
+  ctx.shadowColor = 'rgba(255,255,255,0.7)';
+  ctx.shadowBlur = 12;
+  ctx.fillText('汉堡工坊', W / 2, 250);
+  ctx.shadowBlur = 0;
+  ctx.font = '20px "PingFang SC", sans-serif';
+  ctx.fillStyle = '#9a6a34';
+  ctx.fillText('看菜谱 · 记搭配 · 拼出美味汉堡', W / 2, 292);
+
+  button('start', W / 2 - 130, 340, 260, 62, '▶  开始游戏', '#fff', '#ff7a1f', 22);
+
+  ctx.font = '14px "PingFang SC", sans-serif';
+  ctx.fillStyle = '#a08060';
+  ctx.fillText('初级 简单上手 ｜ 中级 限时记谱 ｜ 高级 极速挑战', W / 2, 460);
+  ctx.fillText('点击配料 → 拼叠汉堡 → 按下「出餐」', W / 2, 486);
+  ctx.restore();
+}
+
+function drawSelect() {
+  drawBackground(); drawFloaters(0.016);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 40px "PingFang SC", sans-serif';
+  ctx.fillStyle = '#6b3f16';
+  ctx.fillText('选择难度', W / 2, 120);
+
+  const cards = [
+    { k: 'easy',   x: 60,  w: 280 },
+    { k: 'medium', x: 360, w: 280 },
+    { k: 'hard',   x: 660, w: 280 },
+  ];
+  cards.forEach((c) => {
+    const d = DIFFICULTIES[c.k];
+    const y = 180, h = 300;
+    const hovered = hoverKey.current === 'card_' + c.k;
+    ctx.save();
+    ctx.shadowColor = 'rgba(120,70,20,0.22)';
+    ctx.shadowBlur = hovered ? 18 : 10;
+    ctx.shadowOffsetY = hovered ? 6 : 4;
+    roundRect(c.x, y, c.w, h, 22);
+    ctx.fillStyle = '#fffdf8';
+    ctx.fill();
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+    ctx.font = '52px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(d.emoji, c.x + c.w / 2, y + 62);
+
+    ctx.font = 'bold 30px "PingFang SC", sans-serif';
+    ctx.fillStyle = '#6b3f16';
+    ctx.fillText(d.name, c.x + c.w / 2, y + 118);
+
+    ctx.font = '15px "PingFang SC", sans-serif';
+    ctx.fillStyle = '#9a6a34';
+    ctx.fillText(d.desc, c.x + c.w / 2, y + 152);
+
+    ctx.font = '13px "PingFang SC", sans-serif';
+    ctx.fillStyle = '#b09070';
+    ctx.fillText('配料 ' + d.min + '~' + d.max + ' 种', c.x + c.w / 2, y + 186);
+    ctx.fillText('时长 ' + d.time + 's' + (isFinite(d.peek) ? ' · 菜谱 ' + d.peek + 's' : ''), c.x + c.w / 2, y + 212);
+
+    ctx.font = 'bold 16px "PingFang SC", sans-serif';
+    ctx.fillStyle = '#e25b2e';
+    ctx.fillText('⭐ 最高 ' + highScores[c.k], c.x + c.w / 2, y + 244);
+
+    ctx.restore();
+  });
+  button('backMenu', W / 2 - 100, 516, 200, 48, '←  返回', '#7a4a1e', '#fff3e0');
+}
+
+function drawOver() {
+  drawBackground();
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  roundRect(150, 90, W - 300, 440, 28);
+  ctx.fillStyle = 'rgba(255,253,248,0.95)';
+  ctx.fill();
+  ctx.shadowColor = 'rgba(120,70,20,0.2)';
+  ctx.shadowBlur = 24;
+  ctx.shadowOffsetY = 6;
+  roundRect(150, 90, W - 300, 440, 28);
+  ctx.fillStyle = '#fffdf8';
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  const d = DIFFICULTIES[diff];
+  ctx.font = '60px serif';
+  ctx.fillText(d.emoji, W / 2, 170);
+  ctx.font = 'bold 40px "PingFang SC", sans-serif';
+  ctx.fillStyle = '#6b3f16';
+  ctx.fillText('打烊啦！', W / 2, 240);
+
+  ctx.font = 'bold 34px "PingFang SC", sans-serif';
+  ctx.fillStyle = '#e25b2e';
+  ctx.fillText('⭐ 最终得分  ' + score, W / 2, 296);
+
+  const isRecord = score >= highScores[diff] && score > 0;
+  if (isRecord) {
+    ctx.font = 'bold 18px "PingFang SC", sans-serif';
+    ctx.fillStyle = '#ff7a1f';
+    ctx.fillText('🏆 新纪录！', W / 2, 332);
+  }
+
+  ctx.font = '16px "PingFang SC", sans-serif';
+  ctx.fillStyle = '#8a6a44';
+  ctx.fillText('最高分 ' + highScores[diff] + ' ｜ 最佳连击 x' + bestCombo + ' ｜ 完成 ' + served + ' 单 ｜ ' + d.name + '难度', W / 2, 368);
+
+  ctx.restore();
+
+  button('again', W / 2 - 240, 470, 200, 52, '↻  再来一次', '#fff', '#ff7a1f', 20);
+  button('selDiff', W / 2 + 40, 470, 200, 52, '☰  选择难度', '#7a4a1e', '#ffe3c9', 20);
+}
+
+/* ---------------- 主循环 ---------------- */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  ctx.clearRect(0, 0, W, H);
+  drawBackground();
+  drawFloaters(dt);
+
+  if (screen === 'menu') {
+    btns.active = { start: { x: W/2 - 130, y: 340, w: 260, h: 62 } };
+    drawMenu();
+  } else if (screen === 'select') {
+    const cards = ['easy', 'medium', 'hard'];
+    const rects = { backMenu: { x: W/2 - 100, y: 516, w: 200, h: 48 } };
+    cards.forEach((k, i) => {
+      rects['card_' + k] = { x: [60, 360, 660][i], y: 180, w: 280, h: 300 };
+    });
+    btns.active = rects;
+    drawSelect();
+  } else if (screen === 'play') {
+    if (timeLeft > 0) timeLeft -= dt;
+    if (isFinite(DIFFICULTIES[diff].peek) && !cardFlipped) {
+      flipTimer -= dt;
+      if (flipTimer <= 0) { cardFlipped = true; }
+    }
+    if (timeLeft <= 0) {
+      hearts--;
+      combo = 0;
+      sfx.wrong();
+      spawnText('超时了！', '#d64545', 240);
+      if (hearts <= 0) { gameOver(); }
+      else newCustomer();
+    }
+    if (shake > 0) {
+      ctx.translate(rnd(-shake, shake), rnd(-shake, shake));
+      shake *= 0.88;
+      if (shake < 0.5) shake = 0;
+    }
+    drawHUD();
+    drawTimerBar();
+    drawOrderCard();
+    drawBurgerPlate();
+    drawTray();
+    const gb = gameButtons();
+    btns.active = { ...trayRects(), ...gb };
+    button('serve', gb.serve.x, gb.serve.y, gb.serve.w, gb.serve.h, '🍔  出 餐', '#fff', '#e25b2e', 20);
+    button('undo', gb.undo.x, gb.undo.y, gb.undo.w, gb.undo.h, '↩  撤销', '#7a4a1e', '#ffe3c9', 16);
+    button('back', gb.back.x, gb.back.y, gb.back.w, gb.back.h, '◀  菜单', '#7a4a1e', '#fff3e0', 15);
+    drawParticles(dt);
+    drawMsg(dt);
+  } else if (screen === 'over') {
+    btns.active = {
+      again: { x: W/2 - 240, y: 470, w: 200, h: 52 },
+      selDiff: { x: W/2 + 40, y: 470, w: 200, h: 52 },
+    };
+    drawOver();
+    drawParticles(dt);
+  }
+  requestAnimationFrame(loop);
+}
+
+/* ---------------- 交互 ---------------- */
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mousePos = { x: (e.clientX - rect.left) * (W / rect.width), y: (e.clientY - rect.top) * (H / rect.height) };
+  hoverKey.current = hitTest(btns.active || {}, mousePos.x, mousePos.y);
+});
+canvas.addEventListener('mouseleave', () => { hoverKey.current = null; });
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (W / rect.width);
+  const y = (e.clientY - rect.top) * (H / rect.height);
+  const hit = hitTest(btns.active || {}, x, y);
+  if (!hit) return;
+  if (screen === 'menu') {
+    if (hit === 'start') { screen = 'select'; sfx.click(); }
+  } else if (screen === 'select') {
+    if (hit === 'backMenu') { screen = 'menu'; sfx.click(); }
+    else if (hit.startsWith('card_')) { startGame(hit.slice(5)); }
+  } else if (screen === 'play') {
+    if (hit === 'back') { screen = 'select'; sfx.click(); }
+    else if (hit === 'serve') { if (built.length > 0) serve(); else { sfx.remove(); spawnText('先放点配料吧！', '#d64545', 240); } }
+    else if (hit === 'undo') { if (built.length > 0) { built.pop(); sfx.remove(); } }
+    else if (INGREDIENTS[hit]) { addIngredient(hit); }
+  } else if (screen === 'over') {
+    if (hit === 'again') startGame(diff);
+    else if (hit === 'selDiff') screen = 'select';
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    if (screen === 'play' && built.length > 0) serve();
+  }
+});
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

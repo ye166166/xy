@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#FFFFFF">
+  <title>二十四节气日历</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ====== 顶部导航栏 (小程序风格) ====== -->
+  <div class="nav-bar">
+    <button class="nav-bar-back" id="navBack">← 返回</button>
+    <span class="nav-bar-title" id="navTitle">二十四节气日历</span>
+  </div>
+
+  <!-- ====== 主内容区 ====== -->
+  <div class="app-body">
+
+    <!-- ====== 年份天干地支卡片 ====== -->
+    <div class="year-card" id="yearCard">
+      <span class="yc-emoji" id="yearEmoji">🐴</span>
+      <div class="yc-name" id="yearName">丙午年</div>
+      <div class="yc-tags" id="yearTags"></div>
+      <div class="yc-hint">👆 点击查看详情</div>
+    </div>
+
+    <!-- ====== 四季切换 ====== -->
+    <div class="season-tabs" id="seasonTabs">
+      <button class="season-tab spring" data-season="春">🌸 春</button>
+      <button class="season-tab summer" data-season="夏">☀️ 夏</button>
+      <button class="season-tab autumn" data-season="秋">🍂 秋</button>
+      <button class="season-tab winter" data-season="冬">❄️ 冬</button>
+    </div>
+
+    <!-- ====== 日历 Tab 页 ====== -->
+    <div class="page active" id="tabCalendar">
+      <div class="month-header">
+        <button class="month-arrow" id="btnPrev">◀</button>
+        <div class="month-title">
+          <div class="mt-year" id="mYear">2026年</div>
+          <div class="mt-month" id="mMonth">8月</div>
+          <div class="mt-ganzhi" id="mGanzhi">丙申月</div>
+        </div>
+        <button class="month-arrow" id="btnNext">▶</button>
+      </div>
+
+      <button class="today-mini-btn" id="btnToday">📅 今天</button>
+
+      <div class="shichen-row" id="shichenRow">
+        <div class="sr-icon" id="srIcon">🐴</div>
+        <div style="flex:1;min-width:0;">
+          <div class="sr-name" id="srName">午时</div>
+          <div class="sr-detail" id="srDetail">11:00-13:00 · 属午 · 马</div>
+        </div>
+        <span class="sr-arrow">›</span>
+      </div>
+
+      <div class="calendar-card">
+        <div class="weekday-bar">
+          <div class="weekday-item weekend">日</div>
+          <div class="weekday-item">一</div>
+          <div class="weekday-item">二</div>
+          <div class="weekday-item">三</div>
+          <div class="weekday-item">四</div>
+          <div class="weekday-item">五</div>
+          <div class="weekday-item weekend">六</div>
+        </div>
+        <div class="date-grid" id="dateGrid"></div>
+      </div>
+    </div>
+
+    <!-- ====== 节气 Tab 页 ====== -->
+    <div class="page" id="tabTerms">
+      <div class="page-head">
+        <span class="ph-emoji">🌿</span>
+        <div class="ph-title">二十四节气</div>
+        <div class="ph-sub">点击卡片查看详细解说</div>
+      </div>
+      <div class="term-list" id="termList"></div>
+    </div>
+
+    <!-- ====== 节日 Tab 页 ====== -->
+    <div class="page" id="tabFestivals">
+      <div class="page-head">
+        <span class="ph-emoji">🏮</span>
+        <div class="ph-title">传统节日</div>
+        <div class="ph-sub">点击查看背景与习俗</div>
+      </div>
+      <div class="fest-list" id="festList"></div>
+    </div>
+
+    <!-- ====== 时辰 Tab 页 ====== -->
+    <div class="page" id="tabShichen">
+      <div class="page-head">
+        <span class="ph-emoji">🕐</span>
+        <div class="ph-title">十二时辰</div>
+        <div class="ph-sub">古代计时智慧</div>
+      </div>
+      <div class="sc-list" id="scList"></div>
+    </div>
+
+    <!-- ====== 四季 Tab 页 ====== -->
+    <div class="page" id="tabSeasons">
+      <div class="page-head">
+        <span class="ph-emoji">🌸</span>
+        <div class="ph-title">四季调养</div>
+        <div class="ph-sub">顺应天时 · 养生有道</div>
+      </div>
+      <div id="seasonList"></div>
+    </div>
+
+    <!-- ====== 游戏 Tab 页 ====== -->
+    <div class="page" id="tabGame">
+      <div class="page-head">
+        <span class="ph-emoji">🎮</span>
+        <div class="ph-title">互动游戏</div>
+        <div class="ph-sub">学传统文化 · 赢趣味积分</div>
+      </div>
+
+      <!-- 积分面板 -->
+      <div class="score-panel">
+        <div class="sp-left">
+          <span class="sp-star">⭐</span>
+          <span class="sp-val" id="totalScore">0</span>
+          <span class="sp-label">总积分</span>
+        </div>
+        <div class="sp-right">
+          <div class="sp-stat" id="streakFire" style="display:none;">🔥 <span id="streakCount">0</span>连击</div>
+          <div class="sp-stat" id="bestScore">🏆 最高: <span>0</span></div>
+        </div>
+      </div>
+
+      <!-- 游戏入口卡片 -->
+      <div class="game-cards">
+
+        <div class="game-card" id="gameGanzhiWheel">
+          <div class="gc-emoji">☯️</div>
+          <div class="gc-name">天干地支轮盘</div>
+          <div class="gc-desc">探索六十甲子 · 触摸转动轮盘</div>
+          <div class="gc-tags"><span class="gc-tag">60甲子</span><span class="gc-tag">五行</span><span class="gc-tag">生肖</span></div>
+        </div>
+
+        <div class="game-card" id="gameQuiz">
+          <div class="gc-emoji">🧠</div>
+          <div class="gc-name">知识挑战</div>
+          <div class="gc-desc">节气 · 时辰 · 天干地支问答</div>
+          <div class="gc-tags"><span class="gc-tag">节气</span><span class="gc-tag">时辰</span><span class="gc-tag">干支</span></div>
+        </div>
+
+        <div class="game-card" id="gameMatchTerm">
+          <div class="gc-emoji">🔗</div>
+          <div class="gc-name">节气配对</div>
+          <div class="gc-desc">将节气与所属季节进行配对</div>
+          <div class="gc-tags"><span class="gc-tag">季节</span><span class="gc-tag">配对</span></div>
+        </div>
+
+        <div class="game-card" id="gameSort">
+          <div class="gc-emoji">📊</div>
+          <div class="gc-name">时间排序</div>
+          <div class="gc-desc">按正确顺序排列时间与时辰</div>
+          <div class="gc-tags"><span class="gc-tag">排序</span><span class="gc-tag">时辰</span></div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ====== 底部Tab栏 (小程序风格) ====== -->
+  <div class="tab-bar">
+    <button class="tab-item active" data-tab="tabCalendar">
+      <span class="tab-icon">📅</span>
+      <span>日历</span>
+    </button>
+    <button class="tab-item" data-tab="tabTerms">
+      <span class="tab-icon">🌿</span>
+      <span>节气</span>
+    </button>
+    <button class="tab-item" data-tab="tabFestivals">
+      <span class="tab-icon">🏮</span>
+      <span>节日</span>
+    </button>
+    <button class="tab-item" data-tab="tabShichen">
+      <span class="tab-icon">🕐</span>
+      <span>时辰</span>
+    </button>
+    <button class="tab-item" data-tab="tabSeasons">
+      <span class="tab-icon">🍃</span>
+      <span>四季</span>
+    </button>
+    <button class="tab-item" data-tab="tabGame">
+      <span class="tab-icon">🎮</span>
+      <span>游戏</span>
+    </button>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

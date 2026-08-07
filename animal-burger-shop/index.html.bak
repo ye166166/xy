@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>动物汉堡店</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;user-select:none}
+body{background:#1a1a2e;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:sans-serif}
+canvas{border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.5)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+const W=1200,H=700;c.width=W;c.height=H;
+const C={counterY:70,counterH:370,counterB:440,floorY:440};
+const DEF={bottom_bun:{label:'底层面包',color:'#D4A853',dark:'#B88940'},top_bun:{label:'顶层面包',color:'#D4A853',dark:'#B88940'},raw_patty:{label:'生肉饼',color:'#CD5C5C',dark:'#8B3A3A'},cooked_patty:{label:'熟牛肉饼',color:'#8B4513',dark:'#6B3410'},lettuce:{label:'生菜片',color:'#66BB6A',dark:'#4CAF50'},cheese:{label:'芝士片',color:'#FFD700',dark:'#FFC107'},ketchup:{label:'番茄酱',color:'#FF5252',dark:'#D32F2F'},raw_fries:{label:'生薯条',color:'#E8C878',dark:'#C4A050'},cooked_fries:{label:'熟薯条',color:'#FFD700',dark:'#E6B800'},cola:{label:'可乐',color:'#8B4513',dark:'#5D2E0C'}};
+const PREP_IDS=['bottom_bun','top_bun','raw_patty','lettuce','cheese','ketchup','raw_fries','cola','cooked_patty','cooked_fries'];
+const ANIMALS=[{id:'cat',name:'小猫咪',color:'#FFB347'},{id:'dog',name:'小柴犬',color:'#E8B878'},{id:'sheep',name:'小羊',color:'#F5F0E8'},{id:'fox',name:'小狐狸',color:'#E86A3A'},{id:'hamster',name:'小仓鼠',color:'#C4A882'}];
+const G={screen:'menu',money:50,day:1,timeLeft:120,maxTime:120,customers:[],nextCid:0,spawnTimer:10,spawnInterval:14,maxCustomers:3,prep:{},layers:[],completedBurger:null,grill:[{state:'empty',timer:0,maxTimer:9},{state:'empty',timer:0,maxTimer:9},{state:'empty',timer:0,maxTimer:9}],fryer:[{state:'empty',timer:0,maxTimer:8},{state:'empty',timer:0,maxTimer:8}],drag:null,toast:null,toastTimer:0,shopLevel:0,unlocked:{},todayEarn:0,todayServed:0,dayActive:false,musicStarted:false,plates:new Array(6).fill(null),staffHover:null,staffAnim:{squirrel:{bounce:0,wiggle:0},rabbit:{bounce:0,wiggle:0}}};
+for(const id of PREP_IDS)G.prep[id]=0;
+for(const k of['lettuce','cheese','ketchup','fries_cola'])G.unlocked[k]=false;
+
+function rr(x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke()}}
+function toast(s){G.toast=s;G.toastTimer=2.5}
+
+function getUnlockCount(){let n=0;if(G.unlocked.lettuce)n++;if(G.unlocked.cheese)n++;if(G.unlocked.ketchup)n++;if(G.unlocked.fries_cola)n++;return n}
+function calcOrderPrice(){const mul=[1,1.15,1.3,1.5][G.shopLevel];return Math.floor((19+7*getUnlockCount())*mul)}
+function getCurrentOrder(){const needs={burger:1};if(G.unlocked.fries_cola){needs.fries=1;needs.cola=1}return{name:'豪华牛肉堡',needs,price:calcOrderPrice()}}
+function getRequiredBurgerItems(){const r=['bottom_bun','cooked_patty','top_bun'];if(G.unlocked.lettuce)r.push('lettuce');if(G.unlocked.cheese)r.push('cheese');if(G.unlocked.ketchup)r.push('ketchup');return r}
+function squirrelItems(){const r=['bottom_bun','top_bun','raw_patty'];if(G.unlocked.lettuce)r.push('lettuce');if(G.unlocked.cheese)r.push('cheese');if(G.unlocked.ketchup)r.push('ketchup');return r}
+
+const WALLS=[{bg:'#FFF5E6',line:'#FFDAB3',menu:'#8B4513'},{bg:'#FFF0D0',line:'#E8C8A0',menu:'#A0522D'},{bg:'#FFE8C0',line:'#DDB888',menu:'#CD853F'},{bg:'#FADCB0',line:'#D4A87A',menu:'#B8860B'}];
+const CNTR=[{top:'#C4956A',bot:'#A0785A',stripe:'#B5845A'},{top:'#D4A57A',bot:'#B8886A',stripe:'#C4956A'},{top:'#DDB088',bot:'#C49870',stripe:'#CCA078'},{top:'#E8C098',bot:'#D4A880',stripe:'#DDB088'}];
+
+function drawBg(){
+  const w=WALLS[G.shopLevel]||WALLS[0],cn=CNTR[G.shopLevel]||CNTR[0];
+  const g=ctx.createLinearGradient(0,0,0,C.counterY);g.addColorStop(0,w.bg);g.addColorStop(1,w.bg);ctx.fillStyle=g;ctx.fillRect(0,0,W,C.counterY);
+  ctx.strokeStyle=w.line;ctx.lineWidth=1;for(let x=0;x<W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,C.counterY);ctx.stroke()}
+  if(G.shopLevel>=2){ctx.fillStyle='rgba(255,255,255,0.15)';for(let x=0;x<W;x+=120)for(let y=0;y<C.counterY;y+=40)rr(x+5,y+5,110,30,4,'rgba(255,255,255,0.1)')}
+  if(G.shopLevel>=3){ctx.fillStyle='rgba(255,215,0,0.1)';for(let x=0;x<W;x+=200)ctx.fillRect(x,12,80,2)}
+  rr(8,4,160,34,6,w.menu,'#5D2E0C');ctx.fillStyle='#FFD700';ctx.font='bold 15px sans-serif';ctx.textAlign='center';ctx.fillText('🧾 动物汉堡店',88,28);
+  ctx.fillStyle='rgba(255,255,255,0.2)';rr(170,6,50,16,4,'rgba(0,0,0,0.2)');ctx.fillStyle='#FFF';ctx.font='9px sans-serif';ctx.textAlign='center';ctx.fillText('Lv.'+G.shopLevel,195,18);
+  ctx.beginPath();ctx.arc(1140,30,22,0,Math.PI*2);ctx.fillStyle='#FFF';ctx.fill();ctx.strokeStyle='#333';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#333';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.fillText('🕐',1140,29);
+  ctx.fillStyle=cn.top;ctx.fillRect(0,C.counterY,W,C.counterH);
+  ctx.strokeStyle=cn.stripe;ctx.lineWidth=1;for(let i=0;i<18;i++){const yy=C.counterY+12+i*20;ctx.beginPath();ctx.moveTo(0,yy);for(let x=0;x<W;x+=30)ctx.lineTo(x+15,yy+(i%2?2:-2));ctx.stroke()}
+  const fg=ctx.createLinearGradient(0,C.counterB,0,C.floorY);fg.addColorStop(0,cn.bot);fg.addColorStop(1,cn.bot);ctx.fillStyle=fg;ctx.fillRect(0,C.counterB,W,C.floorY-C.counterB);
+  ctx.fillStyle=cn.top;ctx.fillRect(0,C.counterB,W,4);
+  const fl=ctx.createLinearGradient(0,C.floorY,0,H);fl.addColorStop(0,'#D4C4A8');fl.addColorStop(1,'#C4B498');ctx.fillStyle=fl;ctx.fillRect(0,C.floorY,W,H-C.floorY);
+  ctx.strokeStyle='#B8A888';for(let x=0;x<W;x+=80){ctx.beginPath();ctx.moveTo(x,C.floorY);ctx.lineTo(x,H);ctx.stretch||ctx.stroke()}
+}
+
+const GRILL={x:8,y:75,w:150,h:140},FRYER={x:8,y:222,w:150,h:95};
+function showFryer(){return G.unlocked.fries_cola}
+function drawGrill(){
+  rr(GRILL.x,GRILL.y,GRILL.w,GRILL.h,6,'#555','#333');ctx.fillStyle='#FFF';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.fillText('🔥 烤炉',GRILL.x+GRILL.w/2,GRILL.y+13);
+  for(let i=0;i<3;i++){const sx=GRILL.x+5,sy=GRILL.y+20+i*39,sw=GRILL.w-10,sh=35,s=G.grill[i];
+    rr(sx,sy,sw,sh,4,s.state==='empty'?'#3A3A3A':'#4A4A4A');ctx.strokeStyle='#666';ctx.lineWidth=1;ctx.stroke();
+    if(s.state==='empty'){ctx.fillStyle='#666';ctx.font='9px sans-serif';ctx.fillText('🟤 拖入生肉饼',sx+sw/2,sy+22)}else{const r2=s.timer/s.maxTimer,bw=sw-12,bh=5,bx=sx+6,by=sy+3;
+      ctx.fillStyle='#333';rr(bx,by,bw,bh,2,'#333');let bc;if(r2<0.45)bc='#FF6B35';else if(r2<0.75)bc='#4CAF50';else if(r2<1)bc='#FF9800';else bc='#F44336';
+      rr(bx,by,bw*Math.min(r2,1),bh,2,bc);ctx.fillStyle='#FFF';ctx.font='9px sans-serif';let st='烤制中...';if(s.state==='done')st='✅ 取熟肉饼';if(s.state==='burnt')st='💀 糊了';ctx.fillText(st,sx+sw/2,sy+28)}}
+}
+function gSlot(mx,my){for(let i=0;i<3;i++){const sx=GRILL.x+5,sy=GRILL.y+20+i*39,sw=GRILL.w-10,sh=35;if(mx>=sx&&mx<=sx+sw&&my>=sy&&my<=sy+sh)return i}return-1}
+function drawFryer(){
+  if(!showFryer())return;
+  rr(FRYER.x,FRYER.y,FRYER.w,FRYER.h,6,'#664400','#442200');ctx.fillStyle='#FFD700';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.fillText('🍟 炸锅',FRYER.x+FRYER.w/2,FRYER.y+13);
+  for(let i=0;i<2;i++){const sx=FRYER.x+5,sy=FRYER.y+20+i*36,sw=FRYER.w-10,sh=32,s=G.fryer[i];
+    rr(sx,sy,sw,sh,4,s.state==='empty'?'#553322':'#665533');ctx.strokeStyle='#886644';ctx.lineWidth=1;ctx.stroke();
+    if(s.state==='empty'){ctx.fillStyle='#AA8855';ctx.font='9px sans-serif';ctx.fillText('🟡 拖入生薯条',sx+sw/2,sy+20)}else{const r2=s.timer/s.maxTimer,bw=sw-12,bh=5,bx=sx+6,by=sy+3;
+      ctx.fillStyle='#333';rr(bx,by,bw,bh,2,'#333');let bc;if(r2<0.4)bc='#FFD700';else if(r2<0.7)bc='#FFA000';else if(r2<1)bc='#FF6F00';else bc='#555';
+      rr(bx,by,bw*Math.min(r2,1),bh,2,bc);ctx.fillStyle='#FFF';ctx.font='9px sans-serif';let st='炸制中...';if(s.state==='done')st='✅ 取熟薯条';if(s.state==='burnt')st='💀 焦了';ctx.fillText(st,sx+sw/2,sy+24)}}
+}
+function fSlot(mx,my){for(let i=0;i<2;i++){const sx=FRYER.x+5,sy=FRYER.y+20+i*36,sw=FRYER.w-10,sh=32;if(mx>=sx&&mx<=sx+sw&&my>=sy&&my<=sy+sh)return i}return-1}
+
+const STAFF={x:8,y:325,w:150,h:108};
+function drawStaff(){
+  const sy=showFryer()?325:190;STAFF.y=sy;STAFF.h=showFryer()?108:125;
+  rr(STAFF.x,STAFF.y,STAFF.w,STAFF.h,6,'#E8D5B8','#C4B088');
+  const sx=STAFF.x+5,sw=66,st=showFryer()?96:112;
+  rr(sx,STAFF.y+5,sw,st,5,'#E8D0B0','#D4A87A');
+  const scx=sx+sw/2,sty=STAFF.y+10;
+  const sa=G.staffAnim.squirrel;const sBounce=Math.sin(sa.bounce)*3;
+  // Squirrel body
+  ctx.fillStyle='#C4956A';ctx.beginPath();ctx.ellipse(scx,sty+48+sBounce,14,17,0,0,Math.PI*2);ctx.fill();
+  const sbg=ctx.createRadialGradient(scx-4,sty+44+sBounce,0,scx,sty+48+sBounce,15);
+  sbg.addColorStop(0,'rgba(255,255,255,0.3)');sbg.addColorStop(0.7,'rgba(255,255,255,0)');sbg.addColorStop(1,'rgba(0,0,0,0.2)');
+  ctx.fillStyle=sbg;ctx.beginPath();ctx.ellipse(scx,sty+48+sBounce,14,17,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.1)';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(scx,sty+48+sBounce,14,17,0,0,Math.PI*2);ctx.stroke();
+  // Squirrel tail
+  ctx.fillStyle='#C4956A';ctx.beginPath();ctx.ellipse(scx+16,sty+32+sBounce,8,18,0.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(scx+18,sty+28+sBounce,7,14,0.3,0,Math.PI*2);ctx.fill();
+  for(let i=0;i<5;i++){const a=0.8+i*0.3;ctx.beginPath();ctx.ellipse(scx+18+Math.cos(a)*5,sty+30+Math.sin(a)*9+sBounce,5,8,a*0.3,0,Math.PI*2);ctx.fill()}
+  // Squirrel head
+  ctx.fillStyle='#D4B888';ctx.beginPath();ctx.ellipse(scx,sty+30+sBounce,12,13,0,0,Math.PI*2);ctx.fill();
+  const shg=ctx.createRadialGradient(scx-3,sty+25+sBounce,0,scx,sty+30+sBounce,13);
+  shg.addColorStop(0,'rgba(255,255,255,0.35)');shg.addColorStop(0.5,'rgba(255,255,255,0.05)');shg.addColorStop(1,'rgba(0,0,0,0.2)');
+  ctx.fillStyle=shg;ctx.beginPath();ctx.ellipse(scx,sty+30+sBounce,12,13,0,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.12)';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(scx,sty+30+sBounce,12,13,0,0,Math.PI*2);ctx.stroke();
+  // Squirrel cheek patches
+  ctx.fillStyle='#FFF';ctx.beginPath();ctx.ellipse(scx-7,sty+34+sBounce,5,4,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(scx+7,sty+34+sBounce,5,4,0,0,Math.PI*2);ctx.fill();
+  // Squirrel forehead patch
+  ctx.fillStyle='#FFF';ctx.beginPath();ctx.ellipse(scx,sty+18+sBounce,11,4,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#FFF';ctx.beginPath();ctx.ellipse(scx,sty+15+sBounce,7,5,0,0,Math.PI*2);ctx.fill();
+  // Squirrel anime eyes
+  const shover=G.staffHover==='squirrel';const sWiggle=shover?Math.sin(Date.now()/300)*1.5:0;
+  // Sclera
+  ctx.fillStyle='#FFF';ctx.beginPath();ctx.ellipse(scx-5+sWiggle,sty+30+sBounce,3.5,3.5,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(scx+5+sWiggle,sty+30+sBounce,3.5,3.5,0,0,Math.PI*2);ctx.fill();
+  // Iris
+  const sig=ctx.createRadialGradient(scx-5+sWiggle,sty+29.5+sBounce,0,scx-5+sWiggle,sty+30+sBounce,2.5);
+  sig.addColorStop(0,'#C4956A');sig.addColorStop(0.5,'#8B5A2B');sig.addColorStop(1,'#3A2010');
+  ctx.fillStyle=sig;ctx.beginPath();ctx.arc(scx-5+sWiggle,sty+30+sBounce,2.5,0,Math.PI*2);ctx.fill();
+  const sig2=ctx.createRadialGradient(scx+5+sWiggle,sty+29.5+sBounce,0,scx+5+sWiggle,sty+30+sBounce,2.5);
+  sig2.addColorStop(0,'#C4956A');sig2.addColorStop(0.5,'#8B5A2B');sig2.addColorStop(1,'#3A2010');
+  ctx.fillStyle=sig2;ctx.beginPath();ctx.arc(scx+5+sWiggle,sty+30+sBounce,2.5,0,Math.PI*2);ctx.fill();
+  // Pupil
+  ctx.fillStyle='#1A0E05';ctx.beginPath();ctx.arc(scx-5+sWiggle,sty+30.5+sBounce,1.2,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(scx+5+sWiggle,sty+30.5+sBounce,1.2,0,Math.PI*2);ctx.fill();
+  // Highlights (one large, one small)
+  ctx.fillStyle='#FFF';ctx.beginPath();ctx.arc(scx-5.5+sWiggle,sty+29+sBounce,0.9,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(scx+4.5+sWiggle,sty+29+sBounce,0.9,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(scx-4+sWiggle,sty+31+sBounce,0.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(scx+6+sWiggle,sty+31+sBounce,0.5,0,Math.PI*2);ctx.fill();
+  // Blush gradient
+  const sblg=ctx.createRadialGradient(scx-9+sWiggle,sty+35+sBounce,0,scx-9+sWiggle,sty+35+sBounce,3.5);
+  sblg.addColorStop(0,'rgba(255,130,130,0.4)');sblg.addColorStop(1,'rgba(255,130,130,0)');
+  ctx.fillStyle=sblg;ctx.beginPath();ctx.ellipse(scx-9+sWiggle,sty+35+sBounce,3.5,2.5,0,0,Math.PI*2);ctx.fill();
+  const sblg2=ctx.createRadialGradient(scx+9+sWiggle,sty+35+sBounce,0,scx+9+sWiggle,sty+35+sBounce,3.5);
+  sblg2.addColorStop(0,'rgba(255,130,130,0.4)');sblg2.addColorStop(1,'rgba(255,130,130,0)');
+  ctx.fillStyle=sblg2;ctx.beginPath();ctx.ellipse(scx+9+sWiggle,sty+35+sBounce,3.5,2.5,0,0,Math.PI*2);ctx.fill();
+  // Apron
+  ctx.fillStyle='#E84040';ctx.beginPath();ctx.ellipse(scx,sty+46+sBounce,10,8,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#FFD700';ctx.font='5px sans-serif';ctx.textAlign='center';ctx.fillText('🍔',scx,sty+48+sBounce);
+  // Arms
+  ctx.fillStyle='#D4B888';ctx.beginPath();ctx.ellipse(scx-9,sty+42+sBounce,3,3,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(scx+9,sty+42+sBounce,3,3,0,0,Math.PI*2);ctx.fill();
+  // Feet
+  ctx.fillStyle='#D4B888';ctx.beginPath();ctx.ellipse(scx-5,sty+56+sBounce,4,2,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(scx+5,sty+56+sBounce,4,2,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#5D2E0C';ctx.font='9px sans-serif';ctx.fillText('松鼠',scx,sty+71);ctx.font='7px sans-serif';ctx.fillStyle='#888';ctx.fillText('补基础食材',scx,sty+83);
+  if(!showFryer()){ctx.fillStyle='#AAA';ctx.font='6px sans-serif';ctx.fillText('商店购买薯条可乐',scx,sty+98)}
+  if(showFryer()){
+    const rx=STAFF.x+77;rr(rx,STAFF.y+5,66,96,5,'#F0E8E0','#E0D0C0');
+    const rcx=rx+33,rty=STAFF.y+10;
+    const ra=G.staffAnim.rabbit;const rBounce=Math.sin(ra.bounce)*3;const rWiggle=G.staffHover==='rabbit'?Math.sin(Date.now()/400)*2:0;
+    // Rabbit ears (white outer)
+    ctx.fillStyle='#FFF';ctx.beginPath();ctx.ellipse(rcx-8+rWiggle,rty+22+rBounce,6,18,0.2,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(rcx+8+rWiggle,rty+22+rBounce,6,18,-0.2,0,Math.PI*2);ctx.fill();
+    // Rabbit ears (pink inner)
+    ctx.fillStyle='#FFB5C5';ctx.beginPath();ctx.ellipse(rcx-8+rWiggle,rty+25+rBounce,3,12,0.2,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(rcx+8+rWiggle,rty+25+rBounce,3,12,-0.2,0,Math.PI*2);ctx.fill();
+    // Rabbit body
+    ctx.fillStyle='#FFF';ctx.beginPath();ctx.ellipse(rcx,rty+46+rBounce,12,16,0,0,Math.PI*2);ctx.fill();
+    const rbg=ctx.createRadialGradient(rcx-3,rty+40+rBounce,0,rcx,rty+46+rBounce,13);
+    rbg.addColorStop(0,'rgba(255,255,255,0.5)');rbg.addColorStop(0.6,'rgba(255,255,255,0)');rbg.addColorStop(1,'rgba(0,0,0,0.12)');
+    ctx.fillStyle=rbg;ctx.beginPath();ctx.ellipse(rcx,rty+46+rBounce,12,16,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,0.08)';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(rcx,rty+46+rBounce,12,16,0,0,Math.PI*2);ctx.stroke();
+    // Rabbit head
+    ctx.fillStyle='#FFF';ctx.beginPath();ctx.ellipse(rcx,rty+28+rBounce,11,12,0,0,Math.PI*2);ctx.fill();
+    const rhg=ctx.createRadialGradient(rcx-3,rty+23+rBounce,0,rcx,rty+28+rBounce,12);
+    rhg.addColorStop(0,'rgba(255,255,255,0.5)');rhg.addColorStop(0.5,'rgba(255,255,255,0)');rhg.addColorStop(1,'rgba(0,0,0,0.15)');
+    ctx.fillStyle=rhg;ctx.beginPath();ctx.ellipse(rcx,rty+28+rBounce,11,12,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,0.1)';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(rcx,rty+28+rBounce,11,12,0,0,Math.PI*2);ctx.stroke();
+    // Rabbit anime eyes
+    ctx.fillStyle='#FFF';ctx.beginPath();ctx.ellipse(rcx-5+rWiggle,rty+28+rBounce,3.5,4,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(rcx+5+rWiggle,rty+28+rBounce,3.5,4,0,0,Math.PI*2);ctx.fill();
+    const rig=ctx.createRadialGradient(rcx-5+rWiggle,rty+27.5+rBounce,0,rcx-5+rWiggle,rty+28+rBounce,2.5);
+    rig.addColorStop(0,'#C4956A');rig.addColorStop(0.5,'#8B5A2B');rig.addColorStop(1,'#3A2010');
+    ctx.fillStyle=rig;ctx.beginPath();ctx.arc(rcx-5+rWiggle,rty+28+rBounce,2.5,0,Math.PI*2);ctx.fill();
+    const rig2=ctx.createRadialGradient(rcx+5+rWiggle,rty+27.5+rBounce,0,rcx+5+rWiggle,rty+28+rBounce,2.5);
+    rig2.addColorStop(0,'#C4956A');rig2.addColorStop(0.5,'#8B5A2B');rig2.addColorStop(1,'#3A2010');
+    ctx.fillStyle=rig2;ctx.beginPath();ctx.arc(rcx+5+rWiggle,rty+28+rBounce,2.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#1A0E05';ctx.beginPath();ctx.arc(rcx-5+rWiggle,rty+28.5+rBounce,1.2,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(rcx+5+rWiggle,rty+28.5+rBounce,1.2,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#FFF';ctx.beginPath();ctx.arc(rcx-5.5+rWiggle,rty+27+rBounce,0.9,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(rcx+4.5+rWiggle,rty+27+rBounce,0.9,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(rcx-4+rWiggle,rty+29+rBounce,0.5,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(rcx+6+rWiggle,rty+29+rBounce,0.5,0,Math.PI*2);ctx.fill();
+    // Rabbit blush
+    const rblg=ctx.createRadialGradient(rcx-9+rWiggle,rty+32+rBounce,0,rcx-9+rWiggle,rty+32+rBounce,3.5);
+    rblg.addColorStop(0,'rgba(255,130,130,0.4)');rblg.addColorStop(1,'rgba(255,130,130,0)');
+    ctx.fillStyle=rblg;ctx.beginPath();ctx.ellipse(rcx-9+rWiggle,rty+32+rBounce,3.5,2.5,0,0,Math.PI*2);ctx.fill();
+    const rblg2=ctx.createRadialGradient(rcx+9+rWiggle,rty+32+rBounce,0,rcx+9+rWiggle,rty+32+rBounce,3.5);
+    rblg2.addColorStop(0,'rgba(255,130,130,0.4)');rblg2.addColorStop(1,'rgba(255,130,130,0)');
+    ctx.fillStyle=rblg2;ctx.beginPath();ctx.ellipse(rcx+9+rWiggle,rty+32+rBounce,3.5,2.5,0,0,Math.PI*2);ctx.fill();
+    // Rabbit apron
+    ctx.fillStyle='#B0D4E8';ctx.beginPath();ctx.ellipse(rcx,rty+46+rBounce,10,8,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#8B4513';rr(rcx-4,rty+40+rBounce,8,14,2,'#8B4513');ctx.fillStyle='#FFF';rr(rcx-3,rty+38+rBounce,6,3,1,'#FFF');
+    // Arms
+    ctx.fillStyle='#FFF';ctx.beginPath();ctx.ellipse(rcx-9,rty+42+rBounce,3,3,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(rcx+9,rty+42+rBounce,3,3,0,0,Math.PI*2);ctx.fill();
+    // Feet
+    ctx.fillStyle='#FFB5C5';ctx.beginPath();ctx.ellipse(rcx-5,rty+59+rBounce,4,2,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(rcx+5,rty+59+rBounce,4,2,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#5D2E0C';ctx.font='9px sans-serif';ctx.textAlign='center';ctx.fillText('兔子',rcx,rty+75);ctx.font='7px sans-serif';ctx.fillStyle='#888';
+    ctx.fillText('薯条+可乐',rcx,rty+87);ctx.font='6px sans-serif';ctx.fillText('生薯条+1 可乐+1',rcx,rty+96)
+  }
+}

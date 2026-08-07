@@ -1,0 +1,2009 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🔐 密室逃脱：钻石大盗</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    background: radial-gradient(1200px 800px at 20% 10%, #3b0f5e 0%, #1a0b2e 55%, #120722 100%);
+    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  body { display: flex; align-items: center; justify-content: center; padding: 8px; }
+  .app {
+    position: relative;
+    width: min(980px, 100vw, calc(100vh * 980 / 640));
+    aspect-ratio: 980 / 640;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 30px 90px rgba(0,0,0,.55), 0 0 0 4px rgba(255,255,255,.08);
+    background: linear-gradient(160deg, #ff2d95 0%, #7a0bc0 60%, #3b0f5e 100%);
+  }
+  .screen { position: absolute; inset: 0; display: none; }
+  .screen.active { display: block; }
+
+  /* ---------- 通用按钮 ---------- */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font-weight: 900; color: #fff; border: none; cursor: pointer;
+    border-radius: 14px; padding: 10px 16px; font-size: clamp(13px, 1.6vw, 17px);
+    letter-spacing: 1px; transition: transform .12s ease, filter .12s ease;
+    box-shadow: 0 5px 0 rgba(0,0,0,.28), 0 8px 18px rgba(0,0,0,.25);
+    text-shadow: 0 1px 2px rgba(0,0,0,.35);
+  }
+  .btn:active { transform: translateY(3px) scale(.97); box-shadow: 0 2px 0 rgba(0,0,0,.28); }
+  .btn-pink  { background: linear-gradient(135deg,#ff2d95,#ff5ec7); }
+  .btn-org   { background: linear-gradient(135deg,#ffb400,#ff7a00); color:#5a2e00; text-shadow:none; }
+  .btn-teal  { background: linear-gradient(135deg,#00e5c3,#00b3a8); color:#003b33; text-shadow:none; }
+  .btn-pur   { background: linear-gradient(135deg,#8e2de2,#4a00e0); }
+  .btn-gold  { background: linear-gradient(135deg,#ffe259,#ffa751); color:#5a2e00; text-shadow:none; }
+  .btn-grey  { background: linear-gradient(135deg,#9aa,#667); }
+  .btn.small { padding: 6px 10px; font-size: clamp(11px, 1.3vw, 14px); border-radius: 10px; }
+  .btn:disabled { filter: grayscale(.7) brightness(.7); cursor: not-allowed; }
+
+  /* ---------- 首页 ---------- */
+  #home { display: none; }
+  #home.active { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(12px, 2.4vh, 26px); }
+  .logo {
+    font-size: clamp(34px, 7vw, 74px); font-weight: 900; color: #fff;
+    text-align: center; text-shadow: 0 4px 0 #c2185b, 0 10px 30px rgba(0,0,0,.5);
+    line-height: 1.05;
+  }
+  .logo span { display: block; font-size: clamp(16px, 2.6vw, 26px); color: #ffe259; text-shadow: 0 2px 0 #b26a00; margin-top: 4px; }
+  .home-btns { display: flex; flex-direction: column; gap: clamp(8px, 1.6vh, 16px); width: min(300px, 62%); }
+  .home-btns .btn { padding: clamp(11px, 2vh, 16px); font-size: clamp(15px, 2vw, 21px); }
+  .floaters { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .floater { position: absolute; font-size: clamp(18px, 3.4vw, 40px); animation: floaty 5s ease-in-out infinite; opacity: .85; }
+
+  /* ---------- 顶部条 ---------- */
+  .topbar {
+    display: flex; align-items: center; gap: 10px; padding: clamp(6px,1.2vh,12px) clamp(8px,1.6vw,18px);
+    background: rgba(20,8,40,.6); color: #fff; height: clamp(44px, 8vh, 64px);
+  }
+  .topbar .title { font-weight: 900; font-size: clamp(13px,2vw,19px); text-shadow: 0 2px 0 rgba(0,0,0,.4); }
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px; font-weight: 800;
+    background: rgba(255,255,255,.16); border-radius: 999px; padding: 5px 12px;
+    font-size: clamp(12px,1.5vw,15px); white-space: nowrap;
+  }
+  .pill.coin { background: linear-gradient(135deg,#ffe259,#ffa751); color: #5a2e00; }
+  .pill.timer { background: linear-gradient(135deg,#ff5ec7,#ff2d95); }
+  .spacer { flex: 1; }
+
+  /* ---------- 关卡选择 ---------- */
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(8px, 1.6vw, 16px); padding: clamp(8px, 1.6vw, 18px); }
+  .lvlcard {
+    position: relative; border-radius: 18px; padding: clamp(10px,2vw,20px);
+    cursor: pointer; color: #fff; display: flex; flex-direction: column; gap: 6px;
+    box-shadow: 0 8px 0 rgba(0,0,0,.28), 0 10px 24px rgba(0,0,0,.3);
+    transition: transform .12s;
+  }
+  .lvlcard:active { transform: scale(.96); }
+  .lvlcard .no { font-size: clamp(11px,1.4vw,14px); opacity: .9; font-weight: 800; }
+  .lvlcard .nm { font-size: clamp(15px,2vw,21px); font-weight: 900; text-shadow: 0 2px 0 rgba(0,0,0,.3); }
+  .lvlcard .dc { font-size: clamp(10px,1.3vw,13px); opacity: .95; }
+  .lvlcard .diff { font-size: clamp(10px,1.2vw,12px); background: rgba(0,0,0,.25); border-radius: 999px; padding: 2px 8px; align-self: flex-start; }
+  .lvlcard .stars { letter-spacing: 2px; font-size: clamp(13px,1.7vw,18px); }
+  .lvlcard.locked { filter: grayscale(1) brightness(.6); cursor: not-allowed; }
+  .lvlcard.locked::after {
+    content: "🔒"; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    font-size: clamp(30px,6vw,60px); filter: none; text-shadow: 0 4px 10px rgba(0,0,0,.5);
+  }
+  .dl-e { background: linear-gradient(135deg,#7ef9a0,#0fbf73); }
+  .dl-m { background: linear-gradient(135deg,#ffd000,#ff9d00); color:#5a2e00; text-shadow:none; }
+  .dl-h { background: linear-gradient(135deg,#ff4d6d,#c9184a); }
+
+  /* ================= 可走动的房间场景 ================= */
+  .roomwrap { position: absolute; inset: 0; }
+  .room {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    top: 2.5%; width: 92%; height: 82.5%;
+    border-radius: 18px;
+    box-shadow: inset 0 0 80px rgba(0,0,0,.4), 0 12px 30px rgba(0,0,0,.4);
+    overflow: hidden;
+    transition: opacity .22s ease, transform .22s ease;
+    border: 10px solid rgba(0,0,0,0);
+  }
+  .room.fading { opacity: 0; transform: translateX(-50%) scale(.95); }
+  /* 地板：木纹 */
+  .room .floor {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(120% 70% at 50% 0%, rgba(255,255,255,.12), transparent 55%),
+      repeating-linear-gradient(90deg, rgba(0,0,0,.06) 0 2px, transparent 2px 3.2%),
+      linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.16));
+  }
+  /* 地毯 */
+  .room .rug {
+    position: absolute; left: 50%; top: 50%; width: 56%; height: 46%;
+    transform: translate(-50%,-50%); border-radius: 12px;
+    background: radial-gradient(closest-side, rgba(255,226,89,.28), rgba(255,45,149,.14) 70%, transparent);
+    pointer-events: none;
+  }
+  /* 黑暗中 */
+  .room .darkness { position: absolute; inset: 0; background: rgba(4,2,14,0); pointer-events: none; z-index: 40; transition: background .45s; }
+  .room.dark .darkness { background: rgba(4,2,14,.82); }
+  .roomlabel {
+    position: absolute; top: 8px; left: 10px; z-index: 60;
+    background: rgba(0,0,0,.45); color: #ffe259; font-weight: 900;
+    font-size: clamp(10px,1.4vw,14px); border-radius: 999px; padding: 3px 12px;
+    border: 2px solid rgba(255,255,255,.5); pointer-events: none;
+  }
+  .scene-cell        { background: linear-gradient(160deg,#5a7a9c,#33465e); border-color:#6f92b6; }
+  .scene-guardroom   { background: linear-gradient(160deg,#c9849e,#7a3a58); border-color:#d99ab2; }
+  .scene-library     { background: linear-gradient(160deg,#f2a25c,#b3582e); border-color:#ffc98c; }
+  .scene-archive     { background: linear-gradient(160deg,#a3cf6e,#4a7a38); border-color:#bfe69a; }
+  .scene-lab         { background: linear-gradient(160deg,#4fd0c7,#1c7f78); border-color:#8cece5; }
+  .scene-storageroom { background: linear-gradient(160deg,#7ad0a2,#2f6b52); border-color:#a2e6c0; }
+  .scene-hall        { background: linear-gradient(160deg,#7d6a9e,#3d2c5c); border-color:#a08cc2; }
+  .scene-tomb        { background: linear-gradient(160deg,#8a5a9c,#3d2452); border-color:#aa76bd; }
+  .scene-control     { background: linear-gradient(160deg,#8a6ce0,#35205c); border-color:#ab8cee; }
+  .scene-vault       { background: linear-gradient(160deg,#d8a24a,#7a4a24); border-color:#f0c06a; }
+
+  /* ---------- 家具（拟物，不再是方块按钮） ---------- */
+  .furn {
+    position: absolute; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+    border-radius: 12px;
+    box-shadow: inset 0 -10px 0 rgba(0,0,0,.18), 0 8px 0 rgba(0,0,0,.28), 0 14px 22px rgba(0,0,0,.35);
+    transition: transform .15s, filter .2s, box-shadow .15s;
+    border: 2px solid rgba(255,255,255,.28);
+    padding: 2px;
+  }
+  .furn .fic { font-size: clamp(22px, 4.6vw, 52px); line-height: 1.05; filter: drop-shadow(0 3px 3px rgba(0,0,0,.45)); }
+  .furn .fname {
+    font-size: clamp(8px,1.15vw,12px); font-weight: 800; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.8);
+    background: rgba(0,0,0,.4); border-radius: 999px; padding: 1px 7px; margin-bottom: 2px;
+    opacity: .55; transition: opacity .2s;
+    white-space: nowrap; max-width: 98%; overflow: hidden; text-overflow: ellipsis;
+  }
+  .furn:hover .fname, .furn.near .fname { opacity: 1; }
+  .furn.near { transform: scale(1.12); box-shadow: inset 0 -10px 0 rgba(0,0,0,.18), 0 8px 0 rgba(0,0,0,.28), 0 0 0 3px #ffe259, 0 16px 28px rgba(0,0,0,.4); z-index: 999 !important; }
+  .furn.hintglow { animation: glow 0.9s ease-in-out 4; }
+  .furn.glow { animation: glowPulse 1.6s ease-in-out infinite; filter: none !important; }
+  .room.dark .furn:not(.glow):not(.npc) { filter: brightness(.4) contrast(.9); }
+  .room.dark .furn.npc:not(.glow) { filter: brightness(.5); }
+  .furn .halo { position: absolute; top: -8px; right: -6px; font-size: clamp(12px,1.6vw,16px); }
+  .furn .tag {
+    position: absolute; top: -8px; right: -6px; background: #ff2d95; color:#fff;
+    font-size: clamp(9px,1.2vw,12px); font-weight: 900; border-radius: 999px; padding: 1px 8px;
+    border: 2px solid #fff; z-index: 5;
+  }
+  /* 家具造型 */
+  .furn.bed      { background: linear-gradient(180deg,#ffe6cf,#d9a06a); border-radius: 18px 18px 8px 8px; }
+  .furn.wardrobe { background: linear-gradient(135deg,#b0713e,#7a4a22); border-radius: 8px; border-right: 4px solid rgba(255,255,255,.25); }
+  .furn.desk     { background: linear-gradient(180deg,#e8bc82,#a5713c); border-radius: 10px; }
+  .furn.shelf    { background: linear-gradient(135deg,#a5652f,#6b3d16); border-radius: 8px; }
+  .furn.cabinet  { background: linear-gradient(160deg,#c98462,#7a4a30); border-radius: 8px; }
+  .furn.safe     { background: linear-gradient(160deg,#6f7a8a,#3c4654); border-radius: 10px; }
+  .furn.door     { background: linear-gradient(160deg,#9a6a3c,#5d3a18); border-radius: 8px 8px 4px 4px; }
+  .furn.window   { background: linear-gradient(160deg,#bfe6ff,#7fb2d8); border-radius: 10px; border: 4px solid #8a5a2b; }
+  .furn.table    { background: linear-gradient(180deg,#e6bd85,#a5713c); border-radius: 10px; }
+  .furn.box      { background: linear-gradient(160deg,#d9c08a,#9a7a44); border-radius: 8px; }
+  .furn.pc       { background: linear-gradient(160deg,#8fa4b8,#44596d); border-radius: 8px; }
+  .furn.lamp     { background: linear-gradient(160deg,#ffd25c,#d99a1e); border-radius: 50%; }
+  .furn.switch   { background: linear-gradient(160deg,#cfd6e0,#8f99a8); border-radius: 8px; }
+  .furn.poster   { background: linear-gradient(160deg,#ffe9c4,#e0b57a); border-radius: 4px; }
+  .furn.map      { background: linear-gradient(160deg,#e9dcb0,#b8a36a); border-radius: 4px; }
+  .furn.mural    { background: linear-gradient(160deg,#b6a2c8,#6e5a8a); border-radius: 6px; }
+  .furn.skeleton { background: linear-gradient(160deg,#e8e2d6,#a89e8c); border-radius: 10px; }
+  .furn.armor    { background: linear-gradient(160deg,#b0b8c4,#6e7a8a); border-radius: 10px; }
+  .furn.torch    { background: linear-gradient(160deg,#ff9c3e,#b85a12); border-radius: 10px; }
+  .furn.swordpile{ background: linear-gradient(160deg,#c0c8d4,#7a86a0); border-radius: 10px; }
+  .furn.sarcophagus{ background: linear-gradient(160deg,#9a8a6a,#5d4f35); border-radius: 14px; }
+  .furn.vent     { background: linear-gradient(160deg,#8fa0b0,#4a5868); border-radius: 10px; }
+  .furn.terminal { background: linear-gradient(160deg,#6fd8e0,#2b7a86); border-radius: 10px; }
+  .furn.chest    { background: linear-gradient(160deg,#d09a4a,#8a5a1e); border-radius: 10px; }
+  .furn.cat      { background: radial-gradient(circle at 50% 60%, #ff9ec8, #e65fa0); border-radius: 50%; box-shadow: 0 6px 0 rgba(0,0,0,.25); }
+  .furn.statue   { background: linear-gradient(160deg,#cfc7d8,#7a6a8a); border-radius: 50%; }
+  .furn.generic  { background: linear-gradient(160deg,#d9c3a8,#9a7a5c); }
+  .furn.sink     { background: linear-gradient(180deg,#dfe8ee,#9db0bd); border-radius: 12px; }
+
+  /* 出口 = 门 */
+  .furn.doorway {
+    background: radial-gradient(circle at 50% 40%, #3a2a12 20%, #241708 60%);
+    border: 4px solid rgba(255,255,255,.35); border-radius: 12px 12px 6px 6px;
+    box-shadow: inset 0 0 18px rgba(0,0,0,.7);
+  }
+  .furn.doorway .fic { animation: doorPulse 1.4s ease-in-out infinite; }
+  .furn.doorway .fname { background: rgba(0,0,0,.7); color: #ffe259; }
+
+  /* ---------- 玩家 ---------- */
+  .player {
+    position: absolute; z-index: 500; pointer-events: none;
+    width: 5.5%; height: 9%;
+    display: flex; align-items: center; justify-content: center;
+    transform: translate(-50%,-50%);
+    transition: left .02s linear, top .02s linear;
+  }
+  .player .pf { font-size: clamp(26px,5vw,52px); filter: drop-shadow(0 4px 4px rgba(0,0,0,.5)); line-height:1; }
+  .player .shadow { position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%); width: 60%; height: 16%; background: radial-gradient(circle, rgba(0,0,0,.4), transparent 70%); border-radius: 50%; }
+  .room.dark .player .pf { filter: drop-shadow(0 0 10px rgba(255,255,255,.5)); }
+
+  /* ---------- 交互按钮 / 提示 ---------- */
+  #interactChip {
+    position: absolute; bottom: clamp(58px, 12vh, 74px); left: 50%; transform: translateX(-50%);
+    background: rgba(20,8,40,.85); color: #ffe259; font-weight: 900;
+    border-radius: 999px; padding: 7px 18px; font-size: clamp(12px,1.7vw,15px);
+    border: 2px solid #ffe259; z-index: 70; pointer-events: none;
+    opacity: 0; transition: opacity .2s; white-space: nowrap;
+  }
+  #interactChip.show { opacity: 1; }
+  .interactbtn {
+    position: absolute; right: 12px; bottom: clamp(58px, 12vh, 74px); z-index: 70;
+    width: clamp(64px, 9vw, 92px); height: clamp(64px, 9vw, 92px); border-radius: 50%;
+    border: none; cursor: pointer; font-weight: 900; font-size: clamp(13px,2vw,18px); color:#fff;
+    background: radial-gradient(circle at 35% 30%, #ff7ab8, #ff2d95 60%, #c2185b);
+    box-shadow: 0 6px 0 #8a1040, 0 12px 24px rgba(0,0,0,.4);
+    transition: transform .12s;
+  }
+  .interactbtn:active { transform: translateY(4px) scale(.95); }
+  .interactbtn:disabled { filter: grayscale(.8) brightness(.6); cursor: default; }
+
+  /* 方向键 */
+  .dpad {
+    position: absolute; left: 12px; bottom: clamp(58px, 12vh, 74px); z-index: 70;
+    display: grid; grid-template-columns: repeat(3, clamp(40px,6vw,58px)); grid-template-rows: repeat(2, clamp(40px,6vw,58px)); gap: 4px;
+  }
+  .dpad button {
+    border: none; border-radius: 12px; font-size: clamp(16px,2.4vw,24px); cursor: pointer;
+    background: rgba(255,255,255,.18); color: #fff;
+    box-shadow: 0 4px 0 rgba(0,0,0,.3), inset 0 0 0 2px rgba(255,255,255,.25);
+    touch-action: none;
+  }
+  .dpad button:active { transform: translateY(2px); }
+  .dpad .du { grid-column: 2; }
+  .dpad .dl { grid-column: 1; grid-row: 2; }
+  .dpad .dd { grid-column: 2; grid-row: 2; }
+  .dpad .dr { grid-column: 3; grid-row: 2; }
+
+  /* ---------- 底部工具条 ---------- */
+  .bottombar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    display: flex; gap: clamp(6px,1.2vw,12px); justify-content: center; align-items: center;
+    padding: clamp(5px,1.2vh,10px); background: rgba(20,8,40,.65); z-index: 65;
+  }
+  .bottombar .btn { padding: clamp(8px,1.6vh,12px) clamp(10px,1.6vw,16px); }
+
+  /* ---------- 弹窗 ---------- */
+  #overlay {
+    position: absolute; inset: 0; background: rgba(10,4,25,.68);
+    display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px;
+    backdrop-filter: blur(3px);
+  }
+  #overlay.active { display: flex; }
+  .modal {
+    position: relative;
+    width: min(460px, 94%);
+    max-height: 94%; overflow: auto;
+    background: linear-gradient(160deg, #fff0f7, #ffd9ec 40%, #e8d8ff);
+    border-radius: 22px; padding: clamp(14px, 2.4vw, 24px);
+    box-shadow: 0 20px 60px rgba(0,0,0,.5), 0 0 0 4px rgba(255,255,255,.35);
+    animation: pop .22s ease;
+  }
+  .modal .xclose {
+    position: absolute; top: 8px; right: 8px; width: 30px; height: 30px;
+    border-radius: 50%; border: none; cursor: pointer; font-weight: 900; font-size: 14px;
+    background: #ff2d95; color: #fff; box-shadow: 0 3px 6px rgba(0,0,0,.3);
+  }
+  .modal .mhead { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .modal .mhead .ic { font-size: clamp(30px, 6vw, 48px); }
+  .modal .mhead .ttl { font-size: clamp(17px, 2.6vw, 24px); font-weight: 900; color: #7a0bc0; text-shadow: 0 1px 0 #fff; }
+  .modal .desc { font-size: clamp(13px, 1.9vw, 16px); color: #4a2b6a; line-height: 1.6; background: rgba(255,255,255,.6); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
+  .modal .mbtns { display: flex; flex-direction: column; gap: 9px; }
+  .modal .mbtns .btn { width: 100%; padding: 12px; font-size: clamp(14px,1.9vw,17px); }
+  .modal .row { display: flex; gap: 9px; }
+  .modal .row .btn { flex: 1; }
+  .npcbox {
+    background: rgba(255,255,255,.75); border-radius: 14px; padding: 12px; margin-bottom: 10px;
+    font-size: clamp(14px,2vw,17px); color: #3a1f55; line-height: 1.6; min-height: 70px;
+    border-left: 6px solid #ff2d95;
+  }
+  .quest { background: rgba(255,225,80,.4); border-radius: 10px; padding: 6px 10px; font-size: clamp(12px,1.6vw,14px); color:#7a4d00; font-weight: 700; margin-bottom: 10px; line-height:1.5; }
+
+  /* ---------- 键盘 ---------- */
+  .keypad { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 8px; }
+  .keypad .key {
+    font-size: clamp(18px,3vw,26px); font-weight: 900; padding: clamp(8px,1.6vh,13px);
+    border: none; border-radius: 12px; cursor: pointer; color:#fff;
+    background: linear-gradient(135deg,#ff2d95,#7a0bc0);
+    box-shadow: 0 4px 0 rgba(0,0,0,.25);
+  }
+  .keypad .key:active { transform: translateY(2px); }
+  .keypad .key.fn { background: linear-gradient(135deg,#00e5c3,#00b3a8); color:#003b33; }
+  .digits { display: flex; justify-content: center; gap: 10px; margin: 8px 0 4px; }
+  .digit {
+    width: clamp(36px,7vw,52px); height: clamp(44px,8vw,60px); border-radius: 12px;
+    background: #fff; border: 3px solid #c2185b; font-size: clamp(22px,4vw,34px); font-weight: 900;
+    color: #c2185b; display: flex; align-items: center; justify-content: center;
+    box-shadow: inset 0 0 0 2px rgba(0,0,0,.06);
+  }
+
+  /* ---------- 宝石 ---------- */
+  .gems { display: flex; justify-content: center; gap: 8px; margin: 10px 0; }
+  .gem {
+    width: clamp(40px,8vw,62px); height: clamp(40px,8vw,62px); border-radius: 50%;
+    cursor: pointer; font-size: clamp(20px,4vw,32px); display: flex; align-items: center; justify-content: center;
+    border: 3px solid #fff; box-shadow: 0 4px 8px rgba(0,0,0,.3); transition: transform .1s;
+  }
+  .gem:active { transform: scale(.88); }
+  .gem.picked { outline: 4px solid #ffe259; }
+  .gemseq { display: flex; gap: 6px; justify-content: center; min-height: 26px; margin: 8px 0; }
+  .gemseq .dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; }
+
+  /* ---------- 奖励 / 商店 / 仓库 ---------- */
+  .star { font-size: clamp(30px,6vw,54px); filter: drop-shadow(0 3px 4px rgba(0,0,0,.3)); }
+  .star.lit { animation: starPop .5s ease both; }
+  .star.dim { opacity: .25; }
+  .statline { display: flex; justify-content: center; gap: 16px; margin: 12px 0; flex-wrap: wrap; }
+  .statcard { background: rgba(255,255,255,.7); border-radius: 14px; padding: 8px 16px; text-align: center; font-weight: 800; color:#4a2b6a; }
+  .statcard .v { font-size: clamp(18px,3vw,26px); color:#c2185b; }
+  .shopgrid { display: flex; flex-direction: column; gap: 10px; max-height: 46vh; overflow: auto; padding-right: 4px; }
+  .shopitem {
+    display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,.75);
+    border-radius: 14px; padding: 10px; border: 3px solid rgba(255,255,255,.6);
+  }
+  .shopitem .sic { font-size: clamp(26px,5vw,40px); }
+  .shopitem .sname { font-weight: 900; color: #7a0bc0; font-size: clamp(13px,1.9vw,16px); }
+  .shopitem .sdesc { font-size: clamp(11px,1.5vw,13px); color: #4a2b6a; margin-top: 2px; line-height:1.4; }
+  .shopitem .spacer { flex: 1; }
+  .shopitem .cost { font-weight: 900; color: #b26a00; font-size: clamp(12px,1.7vw,15px); white-space: nowrap; }
+  .empty { text-align: center; color: #4a2b6a; font-weight: 700; padding: 16px; }
+
+  /* ---------- Toast ---------- */
+  #toast {
+    position: absolute; top: 12%; left: 50%; transform: translateX(-50%);
+    background: rgba(15,5,35,.92); color: #fff; font-weight: 800; z-index: 200;
+    padding: 10px 20px; border-radius: 999px; font-size: clamp(13px,1.8vw,16px);
+    box-shadow: 0 8px 24px rgba(0,0,0,.4), 0 0 0 2px rgba(255,255,255,.3);
+    opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
+    max-width: 86%; text-align: center;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(6px); }
+
+  @keyframes pop { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes floaty { 0%,100% { transform: translateY(0) rotate(-6deg);} 50% { transform: translateY(-22px) rotate(8deg);} }
+  @keyframes glow { 0%,100% { box-shadow: 0 8px 0 rgba(0,0,0,.28), 0 0 0 0 #ffe259; } 50% { box-shadow: 0 8px 0 rgba(0,0,0,.28), 0 0 0 14px rgba(255,226,89,0); } }
+  @keyframes glowPulse { 0%,100% { box-shadow: 0 0 12px 5px rgba(255,226,89,.85), 0 8px 0 rgba(0,0,0,.28); } 50% { box-shadow: 0 0 28px 14px rgba(255,226,89,.45), 0 8px 0 rgba(0,0,0,.28); } }
+  @keyframes doorPulse { 0%,100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(255,226,89,.6)); } 50% { transform: scale(1.15); filter: drop-shadow(0 0 12px rgba(255,226,89,1)); } }
+  @keyframes starPop { 0% { transform: scale(0) rotate(-30deg); } 70% { transform: scale(1.4); } 100% { transform: scale(1); } }
+
+  .section-title { font-size: clamp(15px,2.2vw,20px); font-weight: 900; color: #7a0bc0; margin-bottom: 8px; text-shadow: 0 1px 0 #fff; }
+  .tiny { font-size: clamp(10px,1.3vw,12px); color: #7a5c96; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="floaters" id="floaters"></div>
+
+  <!-- ================= 首页 ================= -->
+  <div class="screen" id="home">
+    <div class="logo">🔐 密室逃脱<span>钻石大盗 · 五重密室闯关</span></div>
+    <div class="home-btns">
+      <button class="btn btn-pink" onclick="enterLevelSelect()">▶ 开始游戏</button>
+      <button class="btn btn-teal" onclick="showShop()">🛒 商店 / 升级</button>
+      <button class="btn btn-org"  onclick="showStorage()">📦 仓库 / 收藏</button>
+      <button class="btn btn-pur"   onclick="showSettings()">⚙️ 设置</button>
+    </div>
+    <div class="tiny" style="margin-top:6px;color:#ffe0ff;">真人走动 · 拟实家具 · 放大镜找线索 · 关灯见真相 · 双场景进出</div>
+  </div>
+
+  <!-- ================= 关卡选择 ================= -->
+  <div class="screen" id="levelselect">
+    <div class="topbar">
+      <button class="btn btn-grey small" onclick="showHome()">◀ 返回</button>
+      <span class="title">🗺️ 选择关卡</span>
+      <div class="spacer"></div>
+      <span class="pill coin">🪙 <span id="coinsTop">0</span></span>
+    </div>
+    <div class="grid" id="levelGrid" style="overflow:auto;height:calc(100% - 64px);"></div>
+  </div>
+
+  <!-- ================= 商店 ================= -->
+  <div class="screen" id="shop">
+    <div class="topbar">
+      <button class="btn btn-grey small" onclick="showHome()">◀ 返回</button>
+      <span class="title">🛒 商店 / 升级</span>
+      <div class="spacer"></div>
+      <span class="pill coin">🪙 <span id="shopCoins">0</span></span>
+    </div>
+    <div style="padding:14px 18px;overflow:auto;height:calc(100% - 64px);">
+      <div class="section-title">🔧 侦探装备</div>
+      <div class="shopgrid" id="toolShop"></div>
+      <div class="section-title" style="margin-top:14px;">🎁 消耗道具</div>
+      <div class="shopgrid" id="consumableShop"></div>
+      <div class="section-title" style="margin-top:14px;">⬆️ 永久升级</div>
+      <div class="shopgrid" id="upgradeShop"></div>
+      <p class="tiny" style="margin-top:8px;">提示：放大镜是永久装备，买到后就能对任何线索「放大观察」！</p>
+    </div>
+  </div>
+
+  <!-- ================= 仓库 ================= -->
+  <div class="screen" id="storage">
+    <div class="topbar">
+      <button class="btn btn-grey small" onclick="showHome()">◀ 返回</button>
+      <span class="title">📦 仓库 / 收藏</span>
+      <div class="spacer"></div>
+      <span class="pill coin">🪙 <span id="storeCoins">0</span></span>
+    </div>
+    <div style="padding:14px 18px;overflow:auto;height:calc(100% - 64px);">
+      <div class="section-title">🔧 侦探装备</div>
+      <div class="shopgrid" id="storageTools"></div>
+      <div class="section-title" style="margin-top:14px;">🧰 消耗道具库存</div>
+      <div class="shopgrid" id="storageConsum"></div>
+      <div class="section-title" style="margin-top:14px;">🏆 关卡收藏品</div>
+      <div class="shopgrid" id="storageItems"></div>
+      <div class="section-title" style="margin-top:14px;">📊 冒险数据</div>
+      <div class="shopitem"><span class="sic">⭐</span><div><div class="sname">总星星</div><div class="sdesc">获得的全部星星</div></div><div class="spacer"></div><div class="cost" id="statStars">0</div></div>
+      <div class="shopitem"><span class="sic">🏅</span><div><div class="sname">总积分</div><div class="sdesc">累计闯关得分</div></div><div class="spacer"></div><div class="cost" id="statScore">0</div></div>
+      <div class="shopitem"><span class="sic">🧭</span><div><div class="sname">通关进度</div><div class="sdesc">已解锁关卡</div></div><div class="spacer"></div><div class="cost" id="statProgress">0</div></div>
+    </div>
+  </div>
+
+  <!-- ================= 设置 ================= -->
+  <div class="screen" id="settings">
+    <div class="topbar">
+      <button class="btn btn-grey small" onclick="showHome()">◀ 返回</button>
+      <span class="title">⚙️ 设置</span>
+    </div>
+    <div style="padding:18px;">
+      <div class="shopitem" style="margin-bottom:10px;">
+        <span class="sic">🔊</span>
+        <div><div class="sname">音效</div><div class="sdesc">按钮、提示音效开关</div></div>
+        <div class="spacer"></div>
+        <button class="btn btn-teal small" id="soundBtn" onclick="toggleSound()">开</button>
+      </div>
+      <div class="shopitem">
+        <span class="sic">🧹</span>
+        <div><div class="sname">重置进度</div><div class="sdesc">清除所有金币、道具、通关记录</div></div>
+        <div class="spacer"></div>
+        <button class="btn btn-pink small" onclick="resetSave()">重置</button>
+      </div>
+      <p class="tiny" style="margin-top:12px;">🎮 玩法：用 <b>方向键 / WASD</b>（电脑）或 <b>屏幕摇杆</b>（手机）控制神探在房间里走动，走近物品点击或按 <b>互动</b> 按钮调查；用 <b>🔍 放大镜</b> 观察微小线索；<b>关灯</b> 后有些秘密才会发光现形；走到房间底部的 <b>门</b> 就能进出另一个场景。</p>
+    </div>
+  </div>
+
+  <!-- ================= 游戏 ================= -->
+  <div class="screen" id="game">
+    <div class="topbar">
+      <button class="btn btn-grey small" onclick="quitLevel()">◀ 退出</button>
+      <span class="title" id="levelName">关卡</span>
+      <div class="spacer"></div>
+      <span class="pill timer">⏱ <span id="timer">00:00</span></span>
+      <span class="pill coin">🪙 <span id="gameCoins">0</span></span>
+      <span class="pill">🏅 <span id="gamePts">0</span></span>
+    </div>
+    <div class="roomwrap">
+      <div class="room" id="room"></div>
+    </div>
+
+    <div id="interactChip"></div>
+    <div class="dpad" id="dpad">
+      <button class="du" onpointerdown="dpad('up',1)" onpointerup="dpad('up',0)" onpointerleave="dpad('up',0)" onpointercancel="dpad('up',0)">▲</button>
+      <button class="dl" onpointerdown="dpad('left',1)" onpointerup="dpad('left',0)" onpointerleave="dpad('left',0)" onpointercancel="dpad('left',0)">◀</button>
+      <button class="dd" onpointerdown="dpad('down',1)" onpointerup="dpad('down',0)" onpointerleave="dpad('down',0)" onpointercancel="dpad('down',0)">▼</button>
+      <button class="dr" onpointerdown="dpad('right',1)" onpointerup="dpad('right',0)" onpointerleave="dpad('right',0)" onpointercancel="dpad('right',0)">▶</button>
+    </div>
+    <button class="interactbtn" id="interactBtn" onclick="doInteract()">互动</button>
+
+    <div class="bottombar">
+      <button class="btn btn-gold" onclick="openHint()">💡 提示 <span id="hintCount" style="background:rgba(0,0,0,.2);border-radius:999px;padding:0 6px;"></span></button>
+      <button class="btn btn-teal" onclick="openInventory()">🎒 物品 <span id="bagCount"></span></button>
+      <button class="btn btn-pur" onclick="openToolbox()">🧰 工具 <span id="toolCount"></span></button>
+      <button class="btn btn-grey" onclick="pauseLevel()">⏸ 暂停</button>
+    </div>
+  </div>
+
+  <div id="overlay"></div>
+  <div id="toast"></div>
+</div>
+
+<script>
+/* =================================================================
+   音频
+================================================================= */
+let AC = null;
+function beep(freq, dur, type='sine', vol=0.16, when=0){
+  if(!state.settings.sound) return;
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(), g=AC.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.setValueAtTime(vol, AC.currentTime+when);
+    g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime+when+dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(AC.currentTime+when); o.stop(AC.currentTime+when+dur);
+  }catch(e){}
+}
+function sfx(name){
+  if(name==='click') beep(600,.08,'triangle',.1);
+  if(name==='pickup'){ beep(660,.12,'sine'); beep(990,.14,'sine',.14,.1); }
+  if(name==='error'){ beep(180,.22,'square',.14); beep(150,.22,'square',.12,.18); }
+  if(name==='ok'){ beep(520,.12,'triangle'); beep(780,.14,'triangle',.12,.12); }
+  if(name==='win'){ [523,659,784,1047].forEach((f,i)=>beep(f,.18,'triangle',.16,i*.13)); }
+  if(name==='coin'){ beep(880,.1,'sine'); beep(1320,.12,'sine',.12,.08); }
+  if(name==='cat'){ beep(700,.1,'sine',.12); beep(900,.14,'sine',.12,.1); }
+  if(name==='walk'){ beep(340,.05,'triangle',.05); }
+}
+
+/* =================================================================
+   全局状态
+================================================================= */
+const SAVE_KEY = 'diamond_escape_save_v1';
+function defaultState(){
+  return {
+    coins: 180,
+    totalScore: 0,
+    unlocked: 1,
+    levels: {},
+    inventory: [],
+    collection: [],
+    tools: { lens:false },
+    consumables: { luckyCharm:0, hourglass:0, magnifier:0 },
+    upgrades: { observation:0, intuition:0 },
+    settings: { sound: true },
+  };
+}
+let state = defaultState();
+function save(){
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }catch(e){}
+}
+function load(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(raw){ const s = JSON.parse(raw); state = Object.assign(defaultState(), s, {settings:Object.assign(defaultState().settings, s.settings)}); }
+  }catch(e){}
+}
+function resetSave(){
+  if(confirm('确定要清空所有进度吗？此操作不可恢复！')){
+    state = defaultState(); save(); renderSettings(); toast('进度已重置');
+  }
+}
+load();
+
+let LV = null;
+let RT = null;
+let currentScreen = 'home';
+
+function addCoins(n){ state.coins += n; sfx('coin'); updateCoinPills(); save(); }
+function addPts(n){ RT.pts += n; $('#gamePts').textContent = RT.pts; }
+function $(id){ return document.getElementById(id); }
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+function updateCoinPills(){
+  if($('coinsTop')) $('coinsTop').textContent = state.coins;
+  if($('shopCoins')) $('shopCoins').textContent = state.coins;
+  if($('storeCoins')) $('storeCoins').textContent = state.coins;
+  if($('gameCoins')) $('gameCoins').textContent = state.coins;
+}
+
+/* =================================================================
+   道具 / 消耗品 / 装备 / 使用效果 / 升级
+================================================================= */
+const ITEM_DEFS = {
+  lens:       { name:'放大镜',   icon:'🔍', desc:'神探的放大镜，能看清微小痕迹，找到隐藏线索。' },
+  cellKey:    { name:'锈钥匙',   icon:'🗝️', desc:'一把生锈的钥匙，应该能开牢门上的锁。' },
+  whistle:    { name:'铜哨子',   icon:'📣', desc:'看守的铜哨子，吹起来很响亮。' },
+  badge:      { name:'警徽',     icon:'🏅', desc:'一枚旧警徽，隐约还能看清「D·K」字样。' },
+  quill:      { name:'羽毛笔',   icon:'🪶', desc:'图书馆管理员心爱的羽毛笔。' },
+  codeNote:   { name:'密码纸条', icon:'📄', desc:'上面写着四个数字：4261。' },
+  oldKey:     { name:'复古钥匙', icon:'🗝️', desc:'一把花纹古朴的黄铜钥匙，价值不菲。' },
+  wrench:     { name:'扳手',     icon:'🔧', desc:'实验室的扳手，还沾着机油。' },
+  goggles:    { name:'护目镜',   icon:'🥽', desc:'博士的护目镜，镜片还闪着微光。' },
+  potion:     { name:'绿色试剂', icon:'🧪', desc:'一瓶神秘的绿色溶液，可以融化密封蜡。' },
+  keycard:    { name:'钥匙卡',   icon:'💳', desc:'实验室通行钥匙卡。' },
+  romanNote:  { name:'羊皮纸',   icon:'🧾', desc:'写着：火把照亮黑暗，神剑开启大门；顺序——一四二三。' },
+  torch:      { name:'火把',     icon:'🔥', desc:'熊熊燃烧的火把，能照亮黑暗的角落。' },
+  shield:     { name:'古盾牌',   icon:'🛡️', desc:'锈迹斑斑的骑士盾牌，是件不错的收藏品。' },
+  sword:      { name:'神剑',     icon:'⚔️', desc:'寒光闪闪的神剑，剑柄刻着古纹。' },
+  jewels:     { name:'王室珠宝', icon:'💎', desc:'一盒璀璨的王室珠宝，闪得耀眼！' },
+  screwdriver:{ name:'螺丝刀',   icon:'🪛', desc:'锋利的螺丝刀，能拆开通风口。' },
+  core:       { name:'能源核心', icon:'⚡', desc:'散发着蓝光的能量核心。' },
+  idol:       { name:'神秘雕像', icon:'🗿', desc:'一尊小巧的神秘雕像，价值连城！' },
+  goldBar:    { name:'金条',     icon:'🪙', desc:'沉甸甸的金条，上面刻着钻石符号。' },
+};
+const COLLECTIBLES = ['whistle','badge','quill','oldKey','wrench','goggles','shield','jewels','idol','goldBar'];
+const TOOL_DEFS = {
+  lens: { name:'侦探放大镜', icon:'🔍', price:250, desc:'永久装备：可对任意物品「放大观察」，找出隐藏线索。' },
+};
+const CONSUM_DEFS = {
+  luckyCharm: { name:'幸运护符', icon:'🍀', price:200, desc:'使用提示不再扣分、不掉星（自动生效）' },
+  hourglass:  { name:'时间沙漏', icon:'⏳', price:150, desc:'立即为当前关卡增加 45 秒时间' },
+  magnifier:  { name:'一次性放大镜', icon:'🪞', price:120, desc:'高亮一处尚未发现的道具位置（需走近）' },
+};
+const UPGRADE_DEFS = [
+  { id:'observation', name:'观察力', icon:'👁️', desc:'每级使每次发现道具的积分 +15', base:300 },
+  { id:'intuition',   name:'直觉',   icon:'🧠', desc:'每级减少使用提示的扣分 30%', base:250 },
+];
+const MAX_UPGRADE = 5;
+
+const USES = {
+  cellKey: [
+    { hotspot:'door', need:'codeDone',
+      text:'你用锈钥匙拧开了第二道锁！咔嗒一声，牢门打开了一条缝……',
+      set:['doorOpen'], win:true, points:200 },
+    { hotspot:'door', text:'锁孔被密码锁盖住了，先解开密码锁吧。' },
+  ],
+  potion: [
+    { hotspot:'sealedBox',
+      text:'你把绿色试剂浇在密封蜡上，「嗤——」蜡被溶化了！盒子里有一张钥匙卡。',
+      set:['boxOpen'], consume:true, points:150, give:['keycard'] },
+  ],
+  torch: [
+    { hotspot:'darkWall',
+      text:'火把照亮了黑暗的石壁，露出一个隐藏的机关拉杆！',
+      set:['lit'], consume:true, points:150 },
+  ],
+  sword: [
+    { hotspot:'door', need:'leverDone',
+      text:'你用力将神剑插入门上的剑槽，机关轰然转动，地牢大门缓缓打开！',
+      set:['doorOpen'], win:true, points:250 },
+    { hotspot:'door', text:'大门上有一个剑槽，但似乎还有机关没有解除……' },
+  ],
+  screwdriver: [
+    { hotspot:'vent',
+      text:'你拧开通风口的螺丝，里面藏着一颗发光的能源核心！',
+      set:['ventOpen'], consume:true, points:150, give:['core'] },
+  ],
+  core: [
+    { hotspot:'terminal',
+      text:'能源核心嵌入终端机，屏幕亮起：「系统唤醒——彩虹谜题的答案就藏在你脚下。」',
+      set:['coreDone'], consume:true, points:150 },
+  ],
+  keycard: [
+    { hotspot:'pc',
+      text:'钥匙卡刷过读卡器，「滴」的一声，屏幕上缓缓浮现四个数字：出口密码 7329。',
+      set:['keycardUsed'], points:150 },
+  ],
+};
+
+/* =================================================================
+   关卡数据（双场景 · 可走动）
+================================================================= */
+const GEMS_ORDER = ['red','yellow','green','blue','purple'];
+const GEM_META = {
+  red:{ icon:'🔴', bg:'#ff3b3b' }, yellow:{ icon:'🟡', bg:'#ffd000' },
+  green:{ icon:'🟢', bg:'#2ee06e' }, blue:{ icon:'🔵', bg:'#3b82ff' }, purple:{ icon:'🟣', bg:'#b14dff' },
+};
+
+const LEVELS = [
+{
+  id:1, name:'逃出牢房', icon:'⛓️', diff:'easy', diffName:'简单',
+  timeLimit:330, starTimes:[150,230],
+  intro:'你是一名追踪钻石大盗的神探，却被人打晕丢进了监狱牢房。铁门外隐约传来看守的脚步……',
+  rooms:[
+  { id:'a', name:'牢房', scene:'cell', exits:[{to:'b', icon:'🚪', label:'前往守卫室'}],
+    objects:[
+      { id:'light', name:'电灯开关', icon:'💡', kind:'switch', x:4, y:16, w:8, h:9,
+        actions:[{ t:'light', label:'开关' }]},
+      { id:'wall', name:'墙壁涂鸦', icon:'🎨', kind:'mural', x:42, y:14, w:18, h:14, glow:true,
+        hidden:'用放大镜细看，墙缝里竟刻着一行小字：「钥匙在枕头下，笨蛋。」',
+        actions:[
+          { t:'text', label:'📖 查看', text:'墙上用石头刻着：「314」。看守喜欢把密码随手乱写，真够可以的。', pts:30 },
+        ]},
+      { id:'bed', name:'破旧床铺', icon:'🛏️', kind:'bed', x:8, y:56, w:24, h:17,
+        actions:[
+          { t:'text', label:'📖 查看', text:'床上的稻草都露了出来，好像有人睡过，枕头下鼓鼓的。', pts:20 },
+          { t:'take', label:'✋ 搜索床铺', item:'cellKey', text:'你在枕头下的稻草里摸到了一把冰凉的钥匙！', pts:60, getMsg:'获得 锈钥匙！' },
+        ]},
+      { id:'door', name:'牢房铁门', icon:'🚪', kind:'door', x:76, y:42, w:16, h:34,
+        hidden:'锁孔周围有细微的新鲜划痕——有人最近撬过这把锁。',
+        actions:[
+          { t:'code', label:'🔢 输入密码锁', code:'314', need:null,
+            ok:'「咔哒！」密码锁弹开了，可里面还有一道需要钥匙的锁。', set:['codeDone'], pts:120,
+            fail:'密码锁毫无反应，再想想墙上的线索。' },
+          { t:'use', label:'🗝️ 使用道具' },
+        ]},
+    ],
+    npcs:[] },
+  { id:'b', name:'守卫室', scene:'guardroom', exits:[{to:'a', icon:'🚪', label:'返回牢房'}],
+    objects:[
+      { id:'lens', name:'搁板上的放大镜', icon:'🔍', kind:'desk', x:24, y:30, w:14, h:12, glow:true,
+        actions:[
+          { t:'take', label:'✋ 拿起放大镜', item:'lens', text:'一枚神探专用的放大镜！这下能看清所有细微痕迹了。', pts:40, setLens:true, getMsg:'获得永久装备 放大镜！' },
+        ]},
+      { id:'window', name:'铁窗', icon:'🪟', kind:'window', x:6, y:12, w:18, h:18,
+        hidden:'窗台灰里有个浅浅的猫脚印，猫能自由进出这栋楼。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'窗外月色朦胧，远处的钟楼指针停在 3:14。你心里「咯噔」一下……', pts:40 },
+        ]},
+      { id:'desk', name:'办公桌', icon:'🗄️', kind:'desk', x:36, y:50, w:22, h:16,
+        hidden:'抽屉侧板内侧刻着：密码 314，别问我是怎么知道的。——看守',
+        actions:[
+          { t:'drawer', label:'📂 打开抽屉', item:'whistle', pts:40,
+            text:'抽屉里有本记事本和一枚铜哨子。记事本写着：「牢门密码？不就是墙上那三个数嘛！」',
+            getMsg:'获得收藏品 铜哨子！',
+            emptyText:'抽屉里只剩几张旧收据。' },
+        ]},
+      { id:'wardrobe', name:'旧大衣柜', icon:'👔', kind:'wardrobe', x:60, y:20, w:18, h:30,
+        hidden:'柜脚压着一张值班表：今晚的口令「月亮很方」——月亮怎么会方呢？',
+        actions:[
+          { t:'text', label:'📖 查看', text:'一个结实的旧大衣柜，门缝里似乎夹着什么。', pts:20 },
+          { t:'move', label:'💪 搬开衣柜', item:'badge', pts:50, set:['wardrobeMoved'],
+            text:'你费劲地推开衣柜，地上掉出一件旧警服，口袋里有枚警徽。',
+            getMsg:'获得收藏品 警徽！',
+            emptyText:'衣柜已经挪开过了。' },
+        ]},
+    ],
+    npcs:[
+      { id:'guard', name:'看守', icon:'👮', kind:'npc', x:80, y:44, w:14, h:18,
+        dialogs:[
+          '看守：哟，神探醒了？别费劲了，这三百年没人逃出去过！',
+          '看守：不过嘛……我这人有个毛病，喜欢把密码随手乱写。墙上的那三个数，你该不会看不到吧？',
+          '看守：隔壁办公桌抽屉里那个铜哨子，可是我的心肝宝贝，别偷！',
+        ], coin:25 },
+    ] },
+  ],
+  hints:[
+    '用方向键或屏幕摇杆控制神探在牢房里走动，走近物品就能互动。',
+    '「查看」墙壁涂鸦，那里藏着密码 314。',
+    '把密码输入牢房铁门的密码锁，露出需要钥匙的锁。',
+    '走到房间底部的门，进入「守卫室」，在搁板上「拿起放大镜」——以后就能放大观察任何线索！',
+    '回到牢房搜索床铺拿钥匙，对铁门「使用道具」逃出去！',
+  ],
+},
+{
+  id:2, name:'图书馆之谜', icon:'📚', diff:'easy', diffName:'简单+',
+  timeLimit:360, starTimes:[180,260],
+  intro:'你循着线索追进图书馆，大门「砰」地一声锁上了！馆长笑得神秘：「想要出去？先陪我玩个藏书游戏。」图书馆有两层，别忘了档案室。',
+  rooms:[
+  { id:'a', name:'图书馆', scene:'library', exits:[{to:'b', icon:'🚪', label:'前往档案室'}],
+    objects:[
+      { id:'light', name:'电灯开关', icon:'💡', kind:'switch', x:4, y:16, w:8, h:9,
+        actions:[{ t:'light', label:'开关' }]},
+      { id:'shelf', name:'大书架', icon:'📚', kind:'shelf', x:6, y:16, w:26, h:46,
+        hidden:'书脊上写着极小的字：「四 二 六 一」。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'书架上排满了书，其中一本夹着醒目的红色书签。', pts:20 },
+          { t:'take', label:'✋ 翻开那本书', item:'codeNote', text:'书里夹着一张纸条，你打开一看，上面写着四个数字！', set:['noteRead'], pts:60, getMsg:'获得 密码纸条！' },
+        ]},
+      { id:'desk', name:'木书桌', icon:'🪑', kind:'desk', x:40, y:54, w:24, h:18,
+        hidden:'抽屉缝隙里透出微光——里面放着管理员的手稿。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'桌上有一本摊开的日记，写满了管理员的心事。', pts:20 },
+          { t:'take', label:'✋ 拿起羽毛笔', item:'quill', text:'一支精致的羽毛笔，就当是破案的纪念品吧。', pts:40, getMsg:'获得收藏品 羽毛笔！' },
+          { t:'drawer', label:'📂 打开抽屉', pts:40,
+            text:'抽屉里全是手稿：管理员写道「我把最爱读的书，夹了红书签」。',
+            getMsg:'',
+            emptyText:'抽屉里空空如也。' },
+        ]},
+      { id:'cat', name:'小猫', icon:'🐈', kind:'cat', x:20, y:40, w:10, h:11, roam:true, glow:true,
+        hidden:'猫咪的项圈上挂着一枚小铜牌，刻着「4」字。',
+        actions:[{ t:'pet', label:'🐾 撸猫' }]},
+      { id:'door', name:'图书馆大门', icon:'🚪', kind:'door', x:80, y:42, w:14, h:34,
+        hidden:'锁芯边缘有被指甲划过的痕迹，像一串数字。',
+        actions:[
+          { t:'code', label:'🔢 输入四位密码', code:'4261', need:'noteRead',
+            ok:'大门上的锁应声而开，你成功走出了图书馆！', set:['doorOpen'], win:true, pts:150,
+            needMsg:'没有密码，这扇门可打不开……先找找线索。',
+            fail:'密码错误，再想想那本书里的纸条。' },
+        ]},
+    ],
+    npcs:[
+      { id:'lib', name:'图书管理员', icon:'👓', kind:'npc', x:32, y:18, w:12, h:17,
+        dialogs:[
+          '管理员：咳咳，我生平最爱读书，尤其爱那本夹着红色书签的。',
+          '管理员：听说不专心的人，会把秘密随手夹在书页里当书签……',
+          '管理员：对了，档案室的门我可没锁，里面那位老档案员，知道的可比我多。',
+        ], coin:25 },
+    ] },
+  { id:'b', name:'档案室', scene:'archive', exits:[{to:'a', icon:'🚪', label:'返回图书馆'}],
+    objects:[
+      { id:'map', name:'旧地图', icon:'🗺️', kind:'map', x:8, y:14, w:22, h:17,
+        hidden:'地图背面画着一个红色圆圈，圈着某个保险柜的位置。',
+        actions:[
+          { t:'move', label:'💪 掀开地图', pts:40, set:['mapMoved'],
+            text:'你掀起旧地图，后面露出一台蒙灰的保险柜！',
+            getMsg:'保险柜出现了！',
+            emptyText:'地图已经掀开过了。' },
+        ]},
+      { id:'safe', name:'保险柜', icon:'🔒', kind:'safe', x:8, y:42, w:18, h:22, showWhen:'mapMoved',
+        hidden:'锁孔边上有刮痕，像是有人试过「1234」。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'保险柜上印着四位密码锁，旁边刻着「最爱的一串数字」。', pts:20 },
+          { t:'code', label:'🔢 输入密码', code:'1234', need:null,
+            ok:'保险柜「咔哒」打开，里面放着一把黄铜钥匙！',
+            set:['safeOpen'], give:['oldKey'], pts:120, getMsg:'获得收藏品 复古钥匙！',
+            fail:'密码不对……想想管理员最爱什么。' },
+        ]},
+      { id:'cabinet2', name:'档案柜', icon:'🗃️', kind:'cabinet', x:44, y:20, w:22, h:32,
+        hidden:'柜脚下面压着半张报纸：头条「图书馆盗案，唯一线索——红书签」。',
+        actions:[
+          { t:'drawer', label:'📂 打开抽屉', pts:30,
+            text:'抽屉里是泛黄的旧报纸，头条写着：图书馆盗案，唯一的线索是「红书签」。',
+            getMsg:'',
+            emptyText:'已经翻过这个抽屉了。' },
+        ]},
+    ],
+    npcs:[
+      { id:'archivist', name:'老档案员', icon:'🧓', kind:'npc', x:72, y:26, w:13, h:18,
+        dialogs:[
+          '老档案员：年轻人，来找「4261」的吧？哈哈，别问我是怎么知道的。',
+          '老档案员：图书管理员最喜欢的那本书，红色书签——答案就夹在里面。',
+          '老档案员：顺便说一句，他的保险柜密码，是他初恋的生日。',
+        ], coin:30 },
+    ] },
+  ],
+  hints:[
+    '走到书架旁互动，翻开夹着红色书签的书，拿到密码纸条。',
+    '关灯试试！黑黢黢的图书馆里，有些东西会发光。',
+    '走到底部的门进入「档案室」，掀开地图会出现保险柜。',
+    '用放大镜观察书桌或书架，能发现隐藏的数字。',
+    '把 4261 输入图书馆大门密码锁。',
+  ],
+},
+{
+  id:3, name:'神秘实验室', icon:'🧪', diff:'medium', diffName:'中等',
+  timeLimit:420, starTimes:[220,310],
+  intro:'实验室的自动门反锁了！助手一脸惊慌：「博士失踪前锁了所有出口，还偷偷改了灯……」毒气正在缓缓释放。光与暗，都藏着线索。',
+  rooms:[
+  { id:'a', name:'实验室', scene:'lab', exits:[{to:'b', icon:'🚪', label:'前往杂物间'}],
+    objects:[
+      { id:'light', name:'电灯开关', icon:'💡', kind:'switch', x:4, y:16, w:8, h:9,
+        actions:[{ t:'light', label:'开关' }]},
+      { id:'poster', name:'元素周期表', icon:'🧾', kind:'poster', x:62, y:12, w:14, h:18,
+        hidden:'背面有一行极小的荧光字：「药柜 247」。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'周期表背面用铅笔写着三个数字：「247」。还画了一个绿色的瓶盖。', pts:30 },
+        ]},
+      { id:'cabinet', name:'药柜', icon:'🚪', kind:'cabinet', x:46, y:26, w:14, h:34,
+        hidden:'药柜门缝里飘出淡淡的薄荷味——是绿色试剂的味道。',
+        actions:[
+          { t:'code', label:'🔢 输入药柜密码', code:'247', need:null,
+            ok:'药柜弹开，最上层放着一瓶冒着气泡的绿色试剂！',
+            set:['cabOpen'], give:['potion'], pts:120, getMsg:'获得 绿色试剂！',
+            fail:'密码不对……周期表背面似乎有数字。' },
+        ]},
+      { id:'bench', name:'实验台', icon:'⚗️', kind:'table', x:6, y:58, w:22, h:18,
+        hidden:'台面内侧刻着：绿色试剂能融化任何密封蜡。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'台面上摆着烧杯和试管，中间是一个密封的蜡盒。', pts:20 },
+        ]},
+      { id:'sealedBox', name:'密封蜡盒', icon:'📦', kind:'box', x:16, y:42, w:15, h:13,
+        hidden:'蜡盒底部烧焦了一小块，像是有人做过试验。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'蜡盒被火漆死死封住，需要能融化的东西……', pts:20 },
+          { t:'use', label:'🧪 使用道具' },
+        ]},
+      { id:'pc', name:'电脑终端', icon:'🖥️', kind:'pc', x:82, y:44, w:15, h:24,
+        hidden:'键盘缝隙里粘着一张便签角，隐约写着「7329」。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'屏幕显示：「请插入钥匙卡以获取出口密码。」', pts:20 },
+          { t:'use', label:'💳 使用道具' },
+        ]},
+      { id:'door', name:'实验室大门', icon:'🚪', kind:'door', x:86, y:12, w:12, h:22,
+        hidden:'门框上挂着「毒气排放：ZONE B」的标牌。',
+        actions:[
+          { t:'code', label:'🔢 输入出口密码', code:'7329', need:'keycardUsed',
+            ok:'毒气警报解除，大门缓缓打开，你逃出了实验室！', set:['doorOpen'], win:true, pts:150,
+            needMsg:'门上的密码锁需要密码，电脑终端或许知道答案……',
+            fail:'密码错误……电脑上似乎显示过密码。' },
+        ]},
+    ],
+    npcs:[] },
+  { id:'b', name:'杂物间', scene:'storageroom', exits:[{to:'a', icon:'🚪', label:'返回实验室'}],
+    objects:[
+      { id:'blackboard', name:'荧光黑板', icon:'🖊️', kind:'mural', x:10, y:14, w:24, h:22, darkOnly:true, glow:true,
+        hidden:'黑板上还粘着半截荧光笔，笔帽上写着「博士」两个字。',
+        actions:[
+          { t:'text', label:'🔦 查看', text:'灯一关，黑板上的荧光字就浮现了：「钥匙卡 → 电脑 → 出口密码 7329」。原来是博士用荧光笔写的！', pts:40 },
+        ]},
+      { id:'sink', name:'洗手池', icon:'🚿', kind:'sink', x:40, y:58, w:15, h:16,
+        hidden:'水池塞子上缠着一根头发，还带着绿色试剂的味道。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'池子里泡着一把扳手，看来是杂物房丢在这里的。', pts:20 },
+          { t:'take', label:'✋ 捡起扳手', item:'wrench', text:'一把结实的扳手，留着备用。', pts:40, getMsg:'获得收藏品 扳手！' },
+        ]},
+      { id:'toolchest', name:'工具箱', icon:'🧰', kind:'chest', x:62, y:28, w:19, h:17,
+        hidden:'箱底刻着出厂日期，和实验室大门密码锁的年份一致。',
+        actions:[
+          { t:'drawer', label:'📂 打开工具箱', item:'goggles', pts:40,
+            text:'工具箱里工具乱成一团，压着一副护目镜。',
+            getMsg:'获得收藏品 护目镜！',
+            emptyText:'工具箱已经翻过了。' },
+        ]},
+    ],
+    npcs:[
+      { id:'asst', name:'实验室助手', icon:'🧑‍🔬', kind:'npc', x:78, y:52, w:14, h:17,
+        dialogs:[
+          '助手：完了完了……博士说出口密码只有电脑知道，电脑又需要钥匙卡……',
+          '助手：钥匙卡应该被封在蜡盒里，能融蜡的绿色试剂在药柜！药柜密码……好像和墙上的周期表有关？',
+          '助手：等等，博士还有块荧光黑板，只有关上灯才看得到字！',
+        ], coin:30 },
+    ] },
+  ],
+  hints:[
+    '查看元素周期表背面，得到药柜密码 247，打开药柜拿绿色试剂。',
+    '把绿色试剂「使用」到密封蜡盒上，得到钥匙卡。',
+    '把钥匙卡「使用」到电脑终端上，看到出口密码 7329。',
+    '去「杂物间」关掉灯，荧光黑板会显出完整的通关路径！',
+    '把 7329 输入实验室大门密码锁。',
+  ],
+},
+{
+  id:4, name:'古堡地牢', icon:'🏰', diff:'hard', diffName:'困难',
+  timeLimit:480, starTimes:[260,360],
+  intro:'你坠入了古老的骑士地牢。守墓老人沙哑地说：「能走出这里的，只有真正的勇士……」地牢连着墓室，火把、神剑、机关，一个都不能少。',
+  rooms:[
+  { id:'a', name:'骑士大厅', scene:'hall', exits:[{to:'b', icon:'🪦', label:'前往墓室'}],
+    objects:[
+      { id:'light', name:'墙灯', icon:'🏮', kind:'lamp', x:4, y:14, w:9, h:10,
+        actions:[{ t:'light', label:'开关' }]},
+      { id:'skeleton', name:'骷髅遗骸', icon:'💀', kind:'skeleton', x:6, y:52, w:15, h:21,
+        hidden:'骷髅的手指甲缝里卡着一片干枯的月桂叶。',
+        actions:[
+          { t:'take', label:'✋ 捡起羊皮纸', item:'romanNote', text:'你从骷髅手里取下一张羊皮纸，上面的字迹仍可辨认。', set:['noteRead'], pts:60, getMsg:'获得 羊皮纸！' },
+        ]},
+      { id:'torch', name:'墙上火把', icon:'🔥', kind:'torch', x:24, y:16, w:11, h:17,
+        hidden:'火把的金属托上刻着古字：「照亮黑暗者，方得神剑」。',
+        actions:[
+          { t:'take', label:'✋ 取下火把', item:'torch', text:'你拔下火把，火光照亮了周围。', pts:60, getMsg:'获得 火把！' },
+        ]},
+      { id:'darkWall', name:'黑暗石壁', icon:'🌑', kind:'mural', x:37, y:20, w:13, h:13,
+        hidden:'石缝里塞着一根烧过的火柴。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'太黑了，什么都看不清……', pts:10 },
+          { t:'use', label:'🔥 使用道具' },
+        ]},
+      { id:'lever', name:'机关拉杆', icon:'🕹️', kind:'switch', x:37, y:46, w:13, h:11, showWhen:'lit',
+        actions:[
+          { t:'text', label:'📖 查看', text:'一个隐藏在墙内的机关拉杆！', pts:20 },
+          { t:'flag', label:'✋ 拉动拉杆', set:['leverDone'], text:'你使出全力拉下机关，轰隆声中，大门上露出了一个剑槽！', pts:120 },
+        ]},
+      { id:'armor', name:'骑士盔甲', icon:'🛡️', kind:'armor', x:54, y:16, w:15, h:28,
+        hidden:'盔甲内衬缝着一行小字：「神剑被藏在了石台上」。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'一套空空的盔甲，腰间的神剑早已被拔出——被人拿走了？', pts:20 },
+          { t:'take', label:'✋ 取下盾牌', item:'shield', text:'古盾牌上刻满了历史，值得收藏！', pts:40, getMsg:'获得收藏品 古盾牌！' },
+        ]},
+      { id:'swordPile', name:'石台神剑', icon:'⚔️', kind:'swordpile', x:66, y:54, w:15, h:14,
+        hidden:'剑鞘上刻着古字：「一 四 二 三」。',
+        actions:[
+          { t:'take', label:'✋ 拔出神剑', item:'sword', text:'寒光一闪，你拔出了石台上的神剑！', pts:60, getMsg:'获得 神剑！' },
+        ]},
+      { id:'door', name:'地牢大门', icon:'🚪', kind:'door', x:82, y:40, w:14, h:36,
+        hidden:'门槽里积着新鲜的灰尘——有人最近搬动过这里的机关。',
+        actions:[
+          { t:'use', label:'⚔️ 使用道具' },
+        ]},
+    ],
+    npcs:[
+      { id:'mage', name:'守墓老人', icon:'🧙', kind:'npc', x:72, y:18, w:13, h:17,
+        dialogs:[
+          '老人：年轻人，记住我的话——火把照亮黑暗，神剑开启大门。',
+          '老人：骷髅的手里，握着写给勇者的信。顺序是：一四二三。',
+          '老人：墓室里还有位黑猫大爷，它可比你精明多了。',
+        ], coin:30 },
+    ] },
+  { id:'b', name:'墓室', scene:'tomb', exits:[{to:'a', icon:'🪦', label:'返回骑士大厅'}],
+    objects:[
+      { id:'mural', name:'古壁画', icon:'🖼️', kind:'mural', x:8, y:12, w:24, h:22, glow:true,
+        hidden:'颜料层下露出古字：一 四 二 三。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'壁画上画着勇者的故事，角落刻着四个古字：一 四 二 三。', pts:40 },
+        ]},
+      { id:'sarcophagus', name:'石棺', icon:'🪦', kind:'sarcophagus', x:36, y:34, w:22, h:22,
+        hidden:'棺盖上用细小的文字刻着守墓人的名字和誓言。',
+        actions:[
+          { t:'move', label:'💪 推开棺盖', item:'jewels', pts:60, set:['coffinOpen'],
+            text:'你推开沉重的石棺盖，里面竟是一盒王室珠宝！',
+            getMsg:'获得收藏品 王室珠宝！',
+            emptyText:'石棺盖已经被推开了。' },
+        ]},
+      { id:'cat2', name:'黑猫', icon:'🐈‍⬛', kind:'cat', x:64, y:40, w:10, h:11, roam:true, glow:true,
+        hidden:'黑猫的尾巴梢有一撮白毛，像个「一」字。',
+        actions:[{ t:'pet', label:'🐾 撸猫' }]},
+    ],
+    npcs:[] },
+  ],
+  hints:[
+    '捡起骷髅手里的羊皮纸，读懂线索。',
+    '取走墙上的火把，把火把「使用」到黑暗石壁上，照亮隐藏的机关拉杆。',
+    '拉动机关拉杆，让地牢大门露出剑槽。',
+    '拔出石台上的神剑，再对地牢大门「使用」神剑。',
+    '去「墓室」用放大镜看看壁画和黑猫，会有意外收获！',
+  ],
+},
+{
+  id:5, name:'终局·控制室', icon:'💎', diff:'hard', diffName:'巅峰',
+  timeLimit:540, starTimes:[300,410],
+  intro:'最后一步！你闯进了钻石大盗的控制室，他戴着面具坐在终端前：「神探，来解开我最后的谜题吧。」隔壁是他藏着赃物的珍宝库——最后的出路就在那里。',
+  rooms:[
+  { id:'a', name:'控制室', scene:'control', exits:[{to:'b', icon:'💰', label:'前往珍宝库'}],
+    objects:[
+      { id:'light', name:'电灯开关', icon:'💡', kind:'switch', x:4, y:16, w:8, h:9,
+        actions:[{ t:'light', label:'开关' }]},
+      { id:'toolCabinet', name:'工具柜', icon:'🗄️', kind:'cabinet', x:58, y:46, w:16, h:18,
+        hidden:'柜子抽屉里放着一枚旧硬币，刻着大盗的徽记。',
+        actions:[
+          { t:'take', label:'✋ 打开工具柜', item:'screwdriver', text:'柜子里静静躺着一把螺丝刀。', pts:60, getMsg:'获得 螺丝刀！' },
+        ]},
+      { id:'vent', name:'通风管道', icon:'🌀', kind:'vent', x:28, y:16, w:13, h:11,
+        hidden:'通风口边缘掉着一根蓝色光纤，通向天花板。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'通风口锈迹斑斑，螺丝拧得很紧。', pts:20 },
+          { t:'use', label:'🪛 使用道具' },
+        ]},
+      { id:'terminal', name:'主控终端', icon:'🖥️', kind:'terminal', x:6, y:42, w:19, h:26,
+        hidden:'屏幕边角有一行极小的字：「红 黄 绿 蓝 紫」。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'终端黑屏，只有一个能源插槽在微微发光。', pts:20 },
+          { t:'use', label:'⚡ 使用道具' },
+        ]},
+      { id:'stand', name:'宝石底座', icon:'💠', kind:'table', x:32, y:24, w:28, h:17,
+        hidden:'凹槽内侧刻着：红 黄 绿 蓝 紫。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'底座上有五个凹槽，旁边刻着：彩虹降临，由外而内。', pts:20 },
+          { t:'gems', label:'💎 摆放宝石' },
+        ]},
+    ],
+    npcs:[
+      { id:'boss', name:'神秘人', icon:'🎭', kind:'npc', x:76, y:18, w:14, h:17,
+        dialogs:[
+          '神秘人：神探，我给你个忠告——彩虹，从外到内：红、橙、黄、绿、蓝、靛、紫。',
+          '神秘人：我只放进了五颗宝石，至于顺序……猜吧，哈哈哈！',
+          '神秘人：通往外面的门，就在我的珍宝库里。哦对了，它被我那只黑猫守着。',
+        ], coin:40 },
+    ] },
+  { id:'b', name:'珍宝库', scene:'vault', exits:[{to:'a', icon:'💠', label:'返回控制室'}],
+    objects:[
+      { id:'statue', name:'神秘台座', icon:'🗿', kind:'statue', x:6, y:30, w:15, h:19,
+        hidden:'雕像底座刻着：赠予最贪婪的收藏家。',
+        actions:[
+          { t:'take', label:'✋ 拿走雕像', item:'idol', text:'大盗的收藏品——一尊神秘雕像！', pts:50, getMsg:'获得收藏品 神秘雕像！' },
+        ]},
+      { id:'vaultsafe', name:'金库保险箱', icon:'🔐', kind:'safe', x:36, y:40, w:21, h:24,
+        hidden:'保险箱把手被擦得锃亮——大盗经常开关它。',
+        actions:[
+          { t:'drawer', label:'🔓 试着打开', item:'goldBar', pts:70,
+            text:'保险箱没上锁！里面整整齐齐码着几根金条。',
+            getMsg:'获得收藏品 金条！',
+            emptyText:'保险箱已经空了。' },
+        ]},
+      { id:'wall3', name:'藏宝清单', icon:'📜', kind:'poster', x:58, y:18, w:20, h:18,
+        hidden:'清单背面用铅笔写着：出口钥匙藏在我的猫项圈上（骗你的）。',
+        actions:[
+          { t:'text', label:'📖 查看', text:'清单上写着大盗的收藏：雕像、金条……最后一行：钻石就在门后。', pts:30 },
+        ]},
+      { id:'cat3', name:'黑猫', icon:'🐈‍⬛', kind:'cat', x:76, y:40, w:10, h:11, roam:true, glow:true,
+        hidden:'黑猫的项圈上真的挂着一把迷你钥匙——但只是个玩具。',
+        actions:[{ t:'pet', label:'🐾 撸猫' }]},
+      { id:'door', name:'最终大门', icon:'🚪', kind:'door', x:84, y:44, w:13, h:34,
+        hidden:'门缝里透出一线金色光芒——钻石就在外面！',
+        actions:[
+          { t:'open', label:'🚪 打开大门', need:'gemsDone',
+            needMsg:'大门纹丝不动，似乎需要某种「信号」才能开启……',
+            ok:'大门在宝石的光芒中缓缓打开！你把钻石大盗缉拿归案！', set:['doorOpen'], win:true, pts:300 },
+        ]},
+    ],
+    npcs:[] },
+  ],
+  hints:[
+    '打开工具柜拿到螺丝刀，用螺丝刀拆开通风管道得到能源核心。',
+    '把能源核心装入主控终端，唤醒系统。',
+    '用放大镜观察终端屏幕或宝石底座，能看到宝石顺序。',
+    '按彩虹顺序在底座摆放五颗宝石（红→黄→绿→蓝→紫）。',
+    '去「珍宝库」，拿走赃物，打开最终大门！',
+  ],
+},
+];
+
+function levelById(id){ return LEVELS.find(l=>l.id===id); }
+
+/* =================================================================
+   屏幕导航
+================================================================= */
+function showScreen(name){
+  currentScreen = name;
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $('home').classList.toggle('active', name==='home');
+  $('levelselect').classList.toggle('active', name==='levelselect');
+  $('shop').classList.toggle('active', name==='shop');
+  $('storage').classList.toggle('active', name==='storage');
+  $('settings').classList.toggle('active', name==='settings');
+  $('game').classList.toggle('active', name==='game');
+  closeModal();
+  updateCoinPills();
+}
+function showHome(){ if(LV && RT){ stopTimer(); } showScreen('home'); }
+function enterLevelSelect(){ showScreen('levelselect'); renderLevelGrid(); }
+function showShop(){ showScreen('shop'); renderShop(); }
+function showStorage(){ showScreen('storage'); renderStorage(); }
+function showSettings(){ showScreen('settings'); renderSettings(); }
+
+(function(){
+  const fs=['🔑','💎','🔦','🗝️','📜','🧩','🔍','⏳','🕵️','💠','🏰','🧪','🐈','🪟'];
+  const box=$('floaters');
+  for(let i=0;i<14;i++){
+    const s=document.createElement('span');
+    s.className='floater';
+    s.textContent=fs[i%fs.length];
+    s.style.left=(Math.random()*90)+'%';
+    s.style.top=(Math.random()*85)+'%';
+    s.style.animationDelay=(Math.random()*4)+'s';
+    box.appendChild(s);
+  }
+})();
+
+/* =================================================================
+   关卡选择
+================================================================= */
+function renderLevelGrid(){
+  const grid=$('levelGrid'); grid.innerHTML='';
+  LEVELS.forEach(l=>{
+    const locked = l.id > state.unlocked;
+    const rec = state.levels[l.id];
+    const d = l.diff;
+    const card=document.createElement('div');
+    card.className='lvlcard dl-'+(d==='easy'?'e':d==='medium'?'m':'h')+(locked?' locked':'');
+    const stars = rec ? ('★'.repeat(rec.stars)+'☆'.repeat(3-rec.stars)) : '☆☆☆';
+    card.innerHTML =
+      '<span class="no">第 '+l.id+' 关 · '+l.rooms.length+' 个场景</span>'+
+      '<span class="nm">'+l.icon+' '+l.name+'</span>'+
+      '<span class="diff">'+l.diffName+' · ⏱ '+fmtTime(l.timeLimit)+'</span>'+
+      '<span class="dc">'+(rec?('最佳用时 '+fmtTime(rec.bestTime)+' · 用提示 '+rec.hintsUsed+' 次'):'未通关')+'</span>'+
+      '<span class="stars">'+stars+'</span>';
+    if(!locked) card.onclick=()=>{ startLevel(l.id); };
+    grid.appendChild(card);
+  });
+}
+
+/* =================================================================
+   游戏开始（可走动引擎）
+================================================================= */
+function startLevel(id){
+  const lv=levelById(id);
+  LV=lv;
+  RT={
+    flags:{}, pts:0, hintsUsed:0, penalty:false,
+    timeLeft: lv.timeLimit, paused:false, gemsSeq:[],
+    npcOnce:{}, npcDone:{}, opened:{}, inventory:[], hintsShown:0,
+    lensUsed:{},
+    room: lv.rooms[0].id, dark:false, petDone:false,
+    px:50, py:56, near:null, walkTo:null, blocked:false, foot:false,
+  };
+  RT.inventory = state.inventory.slice();
+  showScreen('game');
+  $('levelName').textContent = lv.icon+' '+lv.name;
+  renderRoom();
+  updateTimer();
+  showIntro(lv.intro);
+  save();
+}
+function fmtTime(s){ s=Math.max(0,Math.round(s)); const m=Math.floor(s/60), ss=s%60; return (m<10?'0':'')+m+':'+(ss<10?'0':'')+ss; }
+
+function curRoom(){ return LV.rooms.find(r=>r.id===RT.room); }
+function shouldShow(o){
+  if(RT.dark && o.lightOnly) return false;
+  if(!RT.dark && o.darkOnly) return false;
+  if(o.showWhen && !RT.flags[o.showWhen]) return false;
+  if(o.hideWhen && RT.flags[o.hideWhen]) return false;
+  return true;
+}
+function allObjects(){ return LV.rooms.reduce((a,r)=>a.concat(r.objects||[]),[]); }
+function findObj(id){ return allObjects().find(o=>o.id===id); }
+function findNpc(id){ return LV.rooms.reduce((a,r)=>a.concat(r.npcs||[]),[]).find(x=>x.id===id); }
+
+/* ---- 渲染房间 ---- */
+function renderRoom(){
+  const roomEl=$('room');
+  const cur=curRoom();
+  roomEl.className='room scene-'+cur.scene+(RT.dark?' dark':'')+(RT.fading?' fading':'');
+  roomEl.innerHTML='<div class="floor"></div><div class="rug"></div><div class="darkness"></div>'+
+    '<div class="roomlabel">📌 '+cur.name+(RT.dark?' · 黑暗中':'')+'</div>';
+  const sprites=[];
+  (cur.objects||[]).forEach(o=>{ if(shouldShow(o)) sprites.push({type:'obj', o}); });
+  (cur.npcs||[]).forEach(n=>{ if(shouldShow(n)) sprites.push({type:'npc', o:Object.assign({},n,{isNpc:true})}); });
+  cur.exits.forEach((ex,i)=>{ sprites.push({type:'exit', ex, order:i}); });
+  sprites.sort((a,b)=>{
+    const ay = a.type==='obj'||a.type==='npc' ? a.o.y : (a.type==='exit'? 88 : 0);
+    const by = b.type==='obj'||b.type==='npc' ? b.o.y : (b.type==='exit'? 88 : 0);
+    return ay-by;
+  });
+  sprites.forEach(s=>{
+    if(s.type==='obj'||s.type==='npc') addFurn(s.o);
+    else addDoor(s.ex, s.order);
+  });
+  // 玩家
+  const p=document.createElement('div');
+  p.className='player'; p.id='player';
+  p.innerHTML='<div class="shadow"></div><div class="pf">🕵️</div>';
+  p.style.left=RT.px+'%'; p.style.top=RT.py+'%';
+  p.style.zIndex=Math.round(RT.py*10)+500;
+  roomEl.appendChild(p);
+  RT.near=null;
+  updateInteractUI();
+  renderHud();
+}
+function addFurn(o){
+  const el=document.createElement('div');
+  el.className='furn '+(o.kind||'generic')+(o.glow?' glow':'')+(o.isNpc?' npc':'');
+  el.id='spr-'+o.id;
+  el.style.left=o.x+'%'; el.style.top=o.y+'%';
+  el.style.width=o.w+'%'; el.style.height=o.h+'%';
+  el.style.zIndex=Math.round(o.y*10);
+  el.innerHTML='<span class="fic">'+o.icon+'</span><span class="fname">'+o.name+'</span>';
+  if(o.isNpc) el.innerHTML+='<span class="tag">NPC</span>';
+  el.onclick=()=>{ sfx('click'); tapSprite(o, o.isNpc? 'npc':'obj'); };
+  $('room').appendChild(el);
+}
+function addDoor(ex, order){
+  const el=document.createElement('div');
+  el.className='furn doorway';
+  el.id='spr-exit-'+ex.to;
+  const x = 42 + order*20;
+  el.style.left=x+'%'; el.style.top='86%';
+  el.style.width='13%'; el.style.height='11%';
+  el.style.zIndex=Math.round(880);
+  el.innerHTML='<span class="fic">'+ex.icon+'</span><span class="fname">'+ex.label+'</span>';
+  el.onclick=()=>{ sfx('click'); tapSprite(ex, 'exit'); };
+  $('room').appendChild(el);
+}
+
+/* ---- 走近 / 互动 ---- */
+const INTERACT_R = 13;
+function centerOf(o){ return { x:o.x+o.w/2, y:o.y+o.h/2 }; }
+function distTo(o){ const c=centerOf(o); return Math.hypot(c.x-RT.px, c.y-RT.py); }
+function exitX(ex){ return 42 + curRoom().exits.findIndex(e=>e===ex)*20 + 6.5; }
+function distToExit(ex){ return Math.hypot(exitX(ex)-RT.px, 91.5-RT.py); }
+function openTarget(o){ if(o.isNpc) openNpc(o); else openObject(o); }
+function tapSprite(target, kind){
+  if(kind==='exit'){
+    if(distToExit(target) <= INTERACT_R+4){ goExit(target); }
+    else{
+      RT.walkTo={ x:exitX(target), y:90, cb:()=>{ goExit(target); } };
+    }
+  }else{
+    if(distTo(target) <= INTERACT_R){ openTarget(target); }
+    else{
+      RT.walkTo={ x:centerOf(target).x, y:centerOf(target).y, cb:()=>{ openTarget(target); } };
+    }
+  }
+}
+function doInteract(){
+  if(!RT.near){ return; }
+  sfx('click');
+  if(RT.near.type==='exit') goExit(RT.near.ex);
+  else openTarget(RT.near.o);
+}
+function goExit(ex){
+  const roomEl=$('room');
+  roomEl.classList.add('fading');
+  RT.fading=true;
+  setTimeout(()=>{
+    RT.room=ex.to;
+    RT.px=50; RT.py=72;
+    RT.walkTo=null;
+    renderRoom();
+    roomEl.classList.remove('fading');
+    RT.fading=false;
+    toast('你来到了：'+curRoom().name);
+  }, 220);
+}
+function updateProximity(){
+  const cur=curRoom();
+  let best=null, bestD=INTERACT_R;
+  (cur.objects||[]).forEach(o=>{
+    if(!shouldShow(o)) return;
+    const d=distTo(o);
+    if(d<bestD){ bestD=d; best={type:'obj', o}; }
+  });
+  (cur.npcs||[]).forEach(n=>{
+    if(!shouldShow(n)) return;
+    const d=distTo(n);
+    if(d<bestD){ bestD=d; best={type:'npc', o:n}; }
+  });
+  cur.exits.forEach(ex=>{
+    const d=distToExit(ex);
+    if(d<bestD){ bestD=d; best={type:'exit', ex}; }
+  });
+  document.querySelectorAll('.furn.near').forEach(e=>e.classList.remove('near'));
+  if(best){
+    RT.near=best;
+    const id = best.type==='exit' ? 'spr-exit-'+best.ex.to : 'spr-'+best.o.id;
+    const el=document.getElementById(id);
+    if(el) el.classList.add('near');
+  }else{
+    RT.near=null;
+  }
+  updateInteractUI();
+}
+function updateInteractUI(){
+  const chip=$('interactChip');
+  const btn=$('interactBtn');
+  if(!chip || !btn) return;
+  if(RT.near){
+    const name = RT.near.type==='exit' ? RT.near.ex.label : RT.near.o.name;
+    chip.textContent='🗝️ '+name;
+    chip.classList.add('show');
+    btn.disabled=false;
+    btn.textContent=RT.near.type==='exit'?'🚪 进入':'💬 互动';
+  }else{
+    chip.classList.remove('show');
+    btn.disabled=true;
+    btn.textContent='互动';
+  }
+}
+
+/* ---- 移动输入 ---- */
+const keys={};
+const DPAD={ up:false, down:false, left:false, right:false };
+function dpad(dir,on){ DPAD[dir]=!!on; }
+function keyState(e){
+  const k=e.key.toLowerCase();
+  return e.key==='ArrowUp'||e.key==='ArrowDown'||e.key==='ArrowLeft'||e.key==='ArrowRight'||k==='w'||k==='a'||k==='s'||k==='d';
+}
+document.addEventListener('keydown', e=>{
+  if(keyState(e)){ e.preventDefault(); keys[e.key.toLowerCase()] = true; }
+  if(e.key==='e' || e.key==='E'){ if(currentScreen==='game' && !RT.blocked) doInteract(); }
+});
+document.addEventListener('keyup', e=>{ if(keyState(e)) keys[e.key.toLowerCase()] = false; });
+
+let lastT=0;
+function gameLoop(t){
+  const dt=Math.min(0.05, (t-lastT)/1000 || 0.016);
+  lastT=t;
+  if(currentScreen==='game' && RT && !RT.blocked){
+    let dx=0, dy=0;
+    if(keys['arrowleft']||keys['a']||DPAD.left) dx-=1;
+    if(keys['arrowright']||keys['d']||DPAD.right) dx+=1;
+    if(keys['arrowup']||keys['w']||DPAD.up) dy-=1;
+    if(keys['arrowdown']||keys['s']||DPAD.down) dy+=1;
+    if(RT.walkTo){
+      const tgt=RT.walkTo;
+      const ddx=tgt.x-RT.px, ddy=tgt.y-RT.py;
+      const d=Math.hypot(ddx,ddy);
+      if(d<2){ const cb=RT.walkTo.cb; RT.walkTo=null; if(cb) cb(); }
+      else{ const sp=55*dt; RT.px+=ddx/d*sp; RT.py+=ddy/d*sp; }
+    }else if(dx||dy){
+      const len=Math.hypot(dx,dy);
+      const sp=55*dt;
+      RT.px+=dx/len*sp; RT.py+=dy/len*sp;
+    }
+    RT.px=clamp(RT.px,3,97); RT.py=clamp(RT.py,9,93);
+    const p=$('player');
+    if(p){ p.style.left=RT.px+'%'; p.style.top=RT.py+'%'; p.style.zIndex=Math.round(RT.py*10)+500; }
+    updateProximity();
+  }
+  if(typeof requestAnimationFrame!=='undefined') requestAnimationFrame(gameLoop);
+}
+
+/* =================================================================
+   物品对象交互
+================================================================= */
+function openObject(obj){
+  let html='<div class="mhead"><span class="ic">'+obj.icon+'</span><span class="ttl">'+obj.name+'</span></div>';
+  html+='<div class="desc">'+obj.desc+'</div><div class="mbtns">';
+  obj.actions.forEach(a=>{
+    if(a.t==='take' && RT.inventory.includes(a.item)) return;
+    if((a.t==='drawer'||a.t==='move') && RT.opened[obj.id]) return;
+    let label=a.label;
+    if(a.t==='light') label = RT.dark ? '💡 开灯' : '🌙 关灯';
+    html+='<button class="btn btn-'+(a.t==='text'||a.t==='flag'?'pur':a.t==='code'?'org':(a.t==='use'||a.t==='pet')?'teal':'pink')+'" onclick="doAction(\''+obj.id+'\',\''+a.t+'\')">'+label+'</button>';
+  });
+  // 放大镜观察
+  if(state.tools.lens && obj.hidden && !RT.lensUsed[obj.id]){
+    html+='<button class="btn btn-gold" onclick="useLens(\''+obj.id+'\')">🔍 用放大镜观察</button>';
+  }else if(!state.tools.lens && obj.hidden){
+    html+='<button class="btn btn-grey" disabled>🔍 需要放大镜（去商店/守卫室拿）</button>';
+  }
+  html+='<button class="btn btn-grey" onclick="closeModal()">✖ 关闭</button>';
+  html+='</div>';
+  openModal(html);
+}
+function useLens(objId){
+  const obj=findObj(objId);
+  if(!obj || !obj.hidden || RT.lensUsed[objId]) return;
+  RT.lensUsed[objId]=true;
+  addPts(20);
+  sfx('ok');
+  closeModal();
+  const html='<div class="mhead"><span class="ic">🔍</span><span class="ttl">放大观察 · '+obj.name+'</span></div>'+
+    '<div class="desc">'+obj.hidden+'</div>'+
+    '<div class="quest">✨ 发现隐藏线索！+20 分</div>'+
+    '<div class="mbtns"><button class="btn btn-pink" onclick="closeModal()">知道了</button></div>';
+  openModal(html);
+}
+function openNpc(npc){
+  const idx = RT.npcOnce[npc.id] || 0;
+  const isLast = idx >= npc.dialogs.length-1;
+  const dlg = npc.dialogs[idx];
+  let html='<div class="mhead"><span class="ic">'+npc.icon+'</span><span class="ttl">'+npc.name+'</span></div>';
+  html+='<div class="npcbox">'+dlg+'</div><div class="mbtns">';
+  if(!isLast){
+    html+='<button class="btn btn-pur" onclick="npcNext(\''+npc.id+'\')">继续 ▶</button>';
+  }else{
+    html+='<button class="btn btn-teal" onclick="closeModal()">结束对话</button>';
+  }
+  if(!RT.npcDone[npc.id] && npc.coin){
+    html+='<div class="quest">💬 首次交谈奖励：'+npc.coin+' 金币</div>';
+  }
+  html+='<button class="btn btn-grey" onclick="closeModal()">✖ 关闭</button></div>';
+  openModal(html);
+  if(isLast && !RT.npcDone[npc.id]){
+    RT.npcDone[npc.id]=true;
+    addPts(40); addCoins(npc.coin);
+    toast('与 '+npc.name+' 交谈 +40 分，获得 '+npc.coin+' 金币');
+  }
+}
+function npcNext(id){ RT.npcOnce[id] = (RT.npcOnce[id]||0)+1; openNpc(findNpc(id)); }
+
+function doAction(objId, type){
+  const obj=findObj(objId);
+  if(!obj) return;
+  const action = obj.actions.find(a=>a.t===type);
+  if(!action) return;
+  sfx('click');
+  if(type==='text'||type==='flag'){
+    addPts(action.pts||20); (action.set||[]).forEach(f=>RT.flags[f]=true); closeModal();
+    showTextModal(obj.icon, action.text); if(type==='flag'){ renderRoom(); renderHud(); }
+  }
+  else if(type==='take'||type==='drawer'||type==='move'){
+    const repeat = (type==='drawer'||type==='move');
+    if(repeat && RT.opened[obj.id]){ closeModal(); showTextModal(obj.icon, action.emptyText||'这里已经被翻过了。'); return; }
+    if(repeat) RT.opened[obj.id]=true;
+    if(action.item){
+      RT.inventory.push(action.item);
+      if(COLLECTIBLES.includes(action.item) && !state.collection.includes(action.item)) state.collection.push(action.item);
+      if(action.setLens) state.tools.lens=true;
+    }
+    addPts(action.pts||50);
+    (action.set||[]).forEach(f=>RT.flags[f]=true);
+    closeModal(); sfx('pickup');
+    showTextModal(obj.icon, action.text, action.getMsg||'');
+    renderRoom(); renderHud(); updateCoinPills();
+  }
+  else if(type==='code'){
+    if(action.need && !RT.flags[action.need]){ closeModal(); showTextModal(obj.icon, action.needMsg||'还缺一点线索……'); return; }
+    closeModal(); openKeypad(obj, action);
+  }
+  else if(type==='use'){ closeModal(); openUseModal(obj); }
+  else if(type==='gems'){ closeModal(); openGems(obj); }
+  else if(type==='light'){
+    RT.dark=!RT.dark; closeModal(); sfx('ok');
+    renderRoom();
+    toast(RT.dark ? '🌙 灯关了，四周一片漆黑……' : '💡 灯亮了！');
+  }
+  else if(type==='pet'){
+    const lines=['🐾 小猫蹭了蹭你的手，舒服地打起呼噜。','🐈 小猫「喵呜」一声，好像在给你指路。','🐱 小猫用爪子扒拉你的裤腿，然后朝一个方向走去。'];
+    const line=lines[Math.floor(Math.random()*lines.length)];
+    addPts(30); closeModal(); sfx('cat');
+    if(!RT.petDone){ RT.petDone=true; addCoins(15); showTextModal('🐈', line, '获得 15 金币！'); }
+    else showTextModal('🐈', line);
+  }
+  else if(type==='open'){
+    if(action.need && !RT.flags[action.need]){ closeModal(); showTextModal('🚪', action.needMsg); return; }
+    closeModal(); showTextModal('🚪', action.ok, null, ()=>{ afterWin(obj, action); });
+  }
+}
+function afterWin(obj, action){
+  addPts(action.pts||200);
+  (action.set||[]).forEach(f=>RT.flags[f]=true);
+  RT.flags.doorOpen=true;
+  completeLevel();
+}
+function giveItems(list){
+  (list||[]).forEach(it=>{
+    RT.inventory.push(it);
+    if(COLLECTIBLES.includes(it) && !state.collection.includes(it)) state.collection.push(it);
+  });
+  renderRoom(); renderHud();
+}
+function renderHud(){
+  if(!RT) return;
+  const bag=RT.inventory.length;
+  $('bagCount').textContent = bag>0 ? '（'+bag+'）':'';
+  const tc = Object.keys(CONSUM_DEFS).reduce((s,k)=>s+state.consumables[k],0);
+  $('toolCount').textContent = tc>0 ? '（'+tc+'）':'';
+  const hn = RT.hintsShown, total = LV.hints.length;
+  $('hintCount').textContent = hn<total ? '（'+(hn+1)+'/'+total+'）' : '（已用尽）';
+}
+
+/* =================================================================
+   弹窗基础
+================================================================= */
+function openModal(html){
+  if(RT) RT.blocked=true;
+  const ov=$('overlay'); ov.innerHTML='<div class="modal"><button class="xclose" onclick="closeModal()">✕</button>'+html+'</div>';
+  ov.classList.add('active');
+  sfx('click');
+}
+function closeModal(){ $('overlay').classList.remove('active'); $('overlay').innerHTML=''; if(RT) RT.blocked=false; }
+let toastTimer=null;
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'), 2400);
+}
+let MODAL_CB=null;
+function runModalCb(){ const f=MODAL_CB; MODAL_CB=null; if(f) f(); }
+function showTextModal(icon, text, sub, onClose){
+  MODAL_CB=onClose||null;
+  let html='<div class="mhead"><span class="ic">'+icon+'</span><span class="ttl">发现</span></div>';
+  html+='<div class="desc">'+text+'</div>';
+  if(sub) html+='<div class="quest">🎉 '+sub+'</div>';
+  html+='<div class="mbtns"><button class="btn btn-pink" onclick="closeModal();runModalCb()">继续 ▶</button></div>';
+  openModal(html);
+}
+
+/* =================================================================
+   密码键盘
+================================================================= */
+let KP = { obj:null, action:null, entered:'' };
+function openKeypad(obj, action){
+  KP={ obj, action, entered:'' };
+  renderKeypad();
+}
+function renderKeypad(){
+  const req = KP.action.code.length;
+  let digits='';
+  for(let i=0;i<req;i++){
+    digits+='<div class="digit">'+ (KP.entered[i]||'') +'</div>';
+  }
+  let keys='';
+  for(let i=1;i<=9;i++) keys+='<button class="key" onclick="kpNum('+i+')">'+i+'</button>';
+  keys+='<button class="key fn" onclick="kpClear()">C</button>';
+  keys+='<button class="key" onclick="kpNum(0)">0</button>';
+  keys+='<button class="key fn" onclick="kpBack()">⌫</button>';
+  const title = KP.obj.name+' · 密码锁';
+  openModal(
+    '<div class="mhead"><span class="ic">🔢</span><span class="ttl">'+title+'</span></div>'+
+    '<div class="digits">'+digits+'</div>'+
+    '<div class="keypad">'+keys+'</div>'+
+    '<div class="row" style="margin-top:10px;"><button class="btn btn-grey" onclick="closeModal()">取消</button>'+
+    '<button class="btn btn-org" onclick="kpSubmit()">确定</button></div>'
+  );
+}
+function kpNum(n){
+  if(KP.entered.length>=KP.action.code.length) return;
+  KP.entered+=n; beep(700,.06,'triangle',.1); renderKeypad();
+}
+function kpClear(){ KP.entered=''; sfx('click'); renderKeypad(); }
+function kpBack(){ KP.entered=KP.entered.slice(0,-1); sfx('click'); renderKeypad(); }
+function kpSubmit(){
+  if(KP.entered.length!==KP.action.code.length){ sfx('error'); return; }
+  if(KP.entered===KP.action.code){
+    sfx('ok');
+    const act=KP.action;
+    addPts(act.pts||120);
+    (act.set||[]).forEach(f=>RT.flags[f]=true);
+    if(act.give) giveItems(act.give);
+    const sub = act.getMsg||'';
+    closeModal();
+    showTextModal('🔓', act.ok, sub, ()=>{ if(act.win){ afterWin(KP.obj, {pts:0,set:[],win:true}); } });
+  }else{
+    sfx('error');
+    if(KP.action.fail){ closeModal(); showTextModal('🔒', KP.action.fail); }
+  }
+}
+
+/* =================================================================
+   使用道具
+================================================================= */
+function openUseModal(obj){
+  const avail = RT.inventory;
+  let html='<div class="mhead"><span class="ic">'+obj.icon+'</span><span class="ttl">使用道具</span></div>';
+  html+='<div class="desc">要把哪个道具用在「'+obj.name+'」上？</div><div class="mbtns">';
+  if(avail.length===0){
+    html+='<div class="empty">还没有任何道具，先去场景里找找吧～</div>';
+  }else{
+    avail.forEach(it=>{
+      const d=ITEM_DEFS[it];
+      html+='<button class="btn btn-teal" onclick="applyUse(\''+obj.id+'\',\''+it+'\')">'+d.icon+' '+d.name+'</button>';
+    });
+  }
+  html+='<button class="btn btn-grey" onclick="closeModal()">取消</button></div>';
+  openModal(html);
+}
+function applyUse(objId, itemId){
+  const obj=findObj(objId);
+  const uses = (USES[itemId]||[]).filter(u=>u.hotspot===objId);
+  const okUse = uses.find(u=>!u.need || RT.flags[u.need]);
+  const needUse = uses.find(u=>u.need);
+  closeModal();
+  if(okUse){
+    sfx('pickup');
+    addPts(okUse.points||120);
+    (okUse.set||[]).forEach(f=>RT.flags[f]=true);
+    if(okUse.consume){ RT.inventory = RT.inventory.filter(i=>i!==itemId); }
+    if(okUse.give) giveItems(okUse.give);
+    if(okUse.win){
+      showTextModal(obj.icon, okUse.text, null, ()=>completeLevel());
+    }else{
+      showTextModal(obj.icon, okUse.text);
+      renderRoom(); renderHud();
+    }
+  }else if(needUse){
+    showTextModal(obj.icon, needUse.text);
+  }else{
+    sfx('error');
+    showTextModal(obj.icon, '……什么反应都没有。');
+  }
+}
+
+/* =================================================================
+   宝石谜题
+================================================================= */
+function openGems(obj){ renderGems(); }
+function renderGems(){
+  const seq = RT.gemsSeq;
+  let dots='';
+  seq.forEach(g=>{ const m=GEM_META[g]; dots+='<div class="dot" style="background:'+m.bg+'"></div>'; });
+  let gems='';
+  Object.keys(GEM_META).forEach(g=>{
+    const m=GEM_META[g];
+    gems+='<div class="gem '+(seq.includes(g)?'picked':'')+'" style="background:'+m.bg+'" onclick="gemPick(\''+g+'\')">'+m.icon+'</div>';
+  });
+  const hint= RT.flags.coreDone ? '<div class="quest">终端提示：彩虹的颜色，由外到内排列。</div>':'<div class="quest">底座还没有信号……也许需要给终端供能。</div>';
+  openModal(
+    '<div class="mhead"><span class="ic">💠</span><span class="ttl">宝石底座</span></div>'+
+    '<div class="desc">按正确的顺序点击五颗宝石，组成序列。</div>'+hint+
+    '<div class="gems">'+gems+'</div>'+
+    '<div class="gemseq">'+dots+'</div>'+
+    '<div class="row">'+
+    '<button class="btn btn-grey" onclick="gemClear()">清空</button>'+
+    '<button class="btn btn-org" onclick="gemSubmit()">确认</button>'+
+    '<button class="btn btn-grey" onclick="closeModal()">取消</button>'+
+    '</div>'
+  );
+  const ok = seq.join(',')===GEMS_ORDER.join(',');
+  if(ok){ setTimeout(()=>{ gemSubmit(); }, 0); }
+}
+function gemPick(g){ if(RT.gemsSeq.includes(g)) return; RT.gemsSeq.push(g); sfx('ok'); renderGems(); }
+function gemClear(){ RT.gemsSeq=[]; sfx('click'); renderGems(); }
+function gemSubmit(){
+  if(RT.gemsSeq.length!==GEMS_ORDER.length){ if(RT.gemsSeq.length) sfx('error'); return; }
+  if(RT.gemsSeq.join(',')===GEMS_ORDER.join(',')){
+    sfx('win');
+    RT.flags.gemsDone=true;
+    addPts(200);
+    closeModal();
+    showTextModal('💠','宝石依次亮起，光芒沿着地面汇聚到最终大门！');
+  }else{
+    sfx('error');
+    RT.gemsSeq=[];
+    toast('顺序不对，宝石的微光熄灭了……');
+    renderGems();
+  }
+}
+
+/* =================================================================
+   提示 / 暂停 / 计时
+================================================================= */
+function openHint(){
+  const hn=RT.hintsShown;
+  if(hn>=LV.hints.length){ toast('提示已经全部用完啦'); return; }
+  const msg = LV.hints[hn];
+  const intLv = state.upgrades.intuition;
+  const cost = Math.max(0, Math.round(50 * Math.pow(0.7, intLv)));
+  const hasCharm = state.consumables.luckyCharm>0;
+  let html='<div class="mhead"><span class="ic">💡</span><span class="ttl">破案提示</span></div>';
+  html+='<div class="desc">'+msg+'</div>';
+  html+='<div class="quest">'+ (hasCharm?'🍀 幸运护符生效，本次提示免费且不掉星！':'使用提示将扣除 '+cost+' 积分，并最高只能获得 2★ 评价。') +'</div>';
+  html+='<div class="mbtns"><button class="btn btn-gold" onclick="confirmHint()">使用提示</button>'+
+        '<button class="btn btn-grey" onclick="closeModal()">取消</button></div>';
+  openModal(html);
+}
+function confirmHint(){
+  const hasCharm = state.consumables.luckyCharm>0;
+  if(!hasCharm){
+    const intLv = state.upgrades.intuition;
+    const cost = Math.max(0, Math.round(50*Math.pow(0.7,intLv)));
+    RT.pts = Math.max(0, RT.pts-cost);
+    RT.penalty = true;
+  }else{
+    state.consumables.luckyCharm--;
+  }
+  RT.hintsShown++;
+  RT.hintsUsed++;
+  closeModal();
+  toast('💡 第 '+RT.hintsShown+' 条提示已显示');
+  renderHud(); updateCoinPills(); save();
+}
+
+function pauseLevel(){
+  if(RT.paused) return;
+  RT.paused=true; stopTimer();
+  const html='<div class="mhead"><span class="ic">⏸️</span><span class="ttl">暂停</span></div>'+
+    '<div class="desc">当前在：'+curRoom().name+'。剩余时间：'+fmtTime(RT.timeLeft)+'。休息一下，准备好了再继续！</div>'+
+    '<div class="mbtns"><button class="btn btn-teal" onclick="resumeLevel()">继续游戏 ▶</button>'+
+    '<button class="btn btn-grey" onclick="quitLevel()">退出关卡</button></div>';
+  openModal(html);
+}
+function resumeLevel(){ closeModal(); RT.paused=false; startTimer(); }
+
+let TIMER_INT=null;
+function startTimer(){
+  if(TIMER_INT) clearInterval(TIMER_INT);
+  TIMER_INT=setInterval(tick,1000);
+}
+function stopTimer(){ if(TIMER_INT) clearInterval(TIMER_INT); TIMER_INT=null; }
+function tick(){
+  if(RT.paused) return;
+  RT.timeLeft--;
+  $('timer').textContent=fmtTime(RT.timeLeft);
+  if(RT.timeLeft<=0){
+    stopTimer();
+    failLevel();
+  }
+}
+function updateTimer(){ if($('timer')) $('timer').textContent=fmtTime(RT.timeLeft); }
+
+function useHourglass(){
+  if(state.consumables.hourglass<=0){ toast('没有时间沙漏了，去商店购买吧'); return; }
+  if(!LV){ return; }
+  state.consumables.hourglass--;
+  RT.timeLeft=Math.min(LV.timeLimit, RT.timeLeft+45);
+  updateTimer(); updateCoinPills(); renderHud(); save();
+  sfx('ok');
+  toast('⏳ 时间增加了 45 秒！');
+}
+function useMagnifier(){
+  if(state.consumables.magnifier<=0){ toast('没有一次性放大镜了，去商店购买吧'); return; }
+  const candidates = [];
+  LV.rooms.forEach(r=>(r.objects||[]).forEach(o=>{
+    o.actions.forEach(a=>{
+      if((a.t==='take'||a.t==='drawer'||a.t==='move') && a.item && !RT.inventory.includes(a.item) && !(RT.opened[o.id]) && shouldShow(o)){
+        candidates.push(o);
+      }
+    });
+  }));
+  if(candidates.length===0){ toast('暂时没有可以高亮的隐藏道具了'); return; }
+  state.consumables.magnifier--;
+  const pick = candidates[Math.floor(Math.random()*candidates.length)];
+  const el=$('spr-'+pick.id);
+  if(el){ el.classList.add('hintglow'); setTimeout(()=>el.classList.remove('hintglow'), 4000); }
+  updateCoinPills(); renderHud(); save();
+  sfx('ok');
+  toast('🔍 一次性放大镜锁定了「'+pick.name+'」！');
+}
+
+function openInventory(){
+  let html='<div class="mhead"><span class="ic">🎒</span><span class="ttl">当前背包</span></div>';
+  if(RT.inventory.length===0){
+    html+='<div class="empty">背包空空如也，去场景里找找线索吧！</div>';
+  }else{
+    html+='<div class="shopgrid">';
+    RT.inventory.forEach(it=>{
+      const d=ITEM_DEFS[it];
+      html+='<div class="shopitem"><span class="sic">'+d.icon+'</span><div><div class="sname">'+d.name+'</div><div class="sdesc">'+d.desc+'</div></div></div>';
+    });
+    html+='</div>';
+  }
+  html+='<div style="margin-top:12px;"><button class="btn btn-grey" style="width:100%;" onclick="closeModal()">关闭</button></div>';
+  openModal(html);
+}
+function openToolbox(){
+  const c=state.consumables;
+  let html='<div class="mhead"><span class="ic">🧰</span><span class="ttl">随身工具</span></div>';
+  html+='<div class="mbtns">';
+  html+='<button class="btn btn-gold" onclick="useHourglass()">⏳ 时间沙漏 ×'+c.hourglass+'</button>';
+  html+='<button class="btn btn-org" onclick="useMagnifier()">🪞 一次性放大镜 ×'+c.magnifier+'</button>';
+  if(state.tools.lens) html+='<button class="btn btn-teal" onclick="closeModal();toast(\'🔍 侦探放大镜已装备：靠近物品互动，选择「用放大镜观察」\')">🔍 侦探放大镜（已装备）</button>';
+  html+='<button class="btn btn-grey" onclick="closeModal()">✖ 关闭</button>';
+  html+='</div><div class="empty" style="text-align:left;">🍀 幸运护符 ×'+c.luckyCharm+'（自动生效）</div>';
+  openModal(html);
+}
+
+/* =================================================================
+   完成 / 失败
+================================================================= */
+function completeLevel(){
+  stopTimer();
+  state.inventory = [];
+  const timeLeft=RT.timeLeft;
+  let stars = 3;
+  if(RT.penalty) stars=Math.min(stars,2);
+  if(timeLeft < LV.starTimes[0]) stars=Math.min(stars,2);
+  if(timeLeft < LV.starTimes[1]) stars=1;
+  const timeBonus = Math.min(500, timeLeft*2);
+  const ptsTotal = RT.pts + 200 + timeBonus;
+  const coinReward = 80 + stars*40;
+  const isFirst = !state.levels[LV.id];
+  state.coins += coinReward;
+  state.totalScore += ptsTotal;
+  if(!state.levels[LV.id]) state.levels[LV.id]={stars:0,bestTime:LV.timeLimit,hintsUsed:0};
+  const rec=state.levels[LV.id];
+  rec.stars=Math.max(rec.stars, stars);
+  rec.bestTime=Math.min(rec.bestTime, LV.timeLimit-timeLeft);
+  if(RT.hintsUsed>0) rec.hintsUsed=RT.hintsUsed;
+  if(LV.id===state.unlocked && LV.id<LEVELS.length) state.unlocked=LV.id+1;
+  save();
+  sfx('win');
+  const collectHere = allObjects().reduce((acc,o)=>acc.concat(o.actions.filter(a=>a.t==='take'||a.t==='drawer'||a.t==='move').map(a=>a.item)),[]);
+  const got = collectHere.filter(it=>COLLECTIBLES.includes(it) && state.collection.includes(it));
+  const collectHtml = (isFirst && got.length) ? '<div class="quest">🏆 本关收藏品：'+got.map(g=>ITEM_DEFS[g].icon).join(' ')+'</div>' : '';
+  let starsHtml='';
+  for(let i=1;i<=3;i++){
+    starsHtml+='<span class="star '+(i<=stars?'lit':'dim')+'">'+(i<=stars?'⭐':'☆')+'</span>';
+  }
+  let html='<div class="mhead"><span class="ic">🏆</span><span class="ttl">逃脱成功！</span></div>'+
+    '<div style="text-align:center;margin:6px 0 0;">'+starsHtml+'</div>'+
+    '<div class="statline">'+
+      '<div class="statcard"><div class="v">+'+timeBonus+'</div>时间奖励</div>'+
+      '<div class="statcard"><div class="v">+'+coinReward+'</div>金币奖励</div>'+
+      '<div class="statcard"><div class="v">'+ptsTotal+'</div>本关积分</div>'+
+    '</div>'+
+    collectHtml+
+    (isFirst? '<div class="quest">🎉 首次通关额外奖励：下一关已解锁！</div>':'')+
+    '<div class="mbtns">'+
+    (LV.id<LEVELS.length?'<button class="btn btn-teal" onclick="nextLevel()">下一关 ▶</button>':'')+
+    '<button class="btn btn-gold" onclick="enterLevelSelect()">返回选关</button></div>';
+  openModal(html);
+  updateCoinPills();
+}
+function nextLevel(){ if(LV.id<LEVELS.length){ startLevel(LV.id+1); } }
+function failLevel(){
+  stopTimer();
+  state.inventory = RT.inventory.slice();
+  save();
+  const html='<div class="mhead"><span class="ic">⏰</span><span class="ttl">时间到！</span></div>'+
+    '<div class="desc">呜呜，计时器归零了……不过没关系，你找到的道具都会保留在背包里，重新出发吧！</div>'+
+    '<div class="mbtns"><button class="btn btn-pink" onclick="retryLevel()">再试一次 🔄</button>'+
+    '<button class="btn btn-grey" onclick="enterLevelSelect()">返回选关</button></div>';
+  openModal(html);
+}
+function retryLevel(){ closeModal(); startLevel(LV.id); }
+function quitLevel(){
+  if(confirm('确定要退出当前关卡吗？本关进度不会保存。')){
+    stopTimer();
+    state.inventory = [];
+    save();
+    enterLevelSelect();
+  }
+}
+
+/* =================================================================
+   介绍
+================================================================= */
+function showIntro(text){
+  stopTimer();
+  const html='<div class="mhead"><span class="ic">📖</span><span class="ttl">'+LV.icon+' 第 '+LV.id+' 关 · '+LV.name+'</span></div>'+
+    '<div class="desc">'+text+'</div>'+
+    '<div class="quest">🎮 操作：方向键 / WASD 或屏幕摇杆控制神探走动；走近物品按「💬 互动」或直接点击；🔍 放大镜观察微小线索；💡 关灯后秘密会发光；走到门口即可进出另一个场景。</div>'+
+    '<div class="quest">🎯 目标：在 '+fmtTime(LV.timeLimit)+' 内解开谜题逃出去！</div>'+
+    '<div class="mbtns"><button class="btn btn-pink" onclick="closeModal();startTimer()">开始冒险 ▶</button></div>';
+  openModal(html);
+}
+
+/* =================================================================
+   商店 / 仓库 / 设置
+================================================================= */
+function renderShop(){
+  updateCoinPills();
+  const tbox=$('toolShop'); tbox.innerHTML='';
+  Object.keys(TOOL_DEFS).forEach(k=>{
+    const d=TOOL_DEFS[k];
+    const owned=!!state.tools[k];
+    const it=document.createElement('div');
+    it.className='shopitem';
+    it.innerHTML='<span class="sic">'+d.icon+'</span><div><div class="sname">'+d.name+'</div><div class="sdesc">'+d.desc+'</div><div class="tiny">'+(owned?'已装备':'一次性购买，永久保留')+'</div></div>'+
+      '<div class="spacer"></div><div class="cost">🪙 '+d.price+'</div>'+
+      (owned?'<button class="btn btn-grey small" disabled>已拥有</button>':'<button class="btn btn-gold small" onclick="buyTool(\''+k+'\')">购买</button>');
+    tbox.appendChild(it);
+  });
+  const cbox=$('consumableShop'); cbox.innerHTML='';
+  Object.keys(CONSUM_DEFS).forEach(k=>{
+    const d=CONSUM_DEFS[k];
+    const own=state.consumables[k];
+    const it=document.createElement('div');
+    it.className='shopitem';
+    it.innerHTML='<span class="sic">'+d.icon+'</span><div><div class="sname">'+d.name+'</div><div class="sdesc">'+d.desc+'</div><div class="tiny">持有 ×'+own+'</div></div>'+
+      '<div class="spacer"></div><div class="cost">🪙 '+d.price+'</div>'+
+      '<button class="btn btn-gold small" onclick="buyConsum(\''+k+'\')">购买</button>';
+    cbox.appendChild(it);
+  });
+  const ubox=$('upgradeShop'); ubox.innerHTML='';
+  UPGRADE_DEFS.forEach(u=>{
+    const lv=state.upgrades[u.id];
+    const cost=u.base*(lv+1);
+    const it=document.createElement('div');
+    it.className='shopitem';
+    it.innerHTML='<span class="sic">'+u.icon+'</span><div><div class="sname">'+u.name+'</div><div class="sdesc">'+u.desc+'</div><div class="tiny">等级 '+(lv+'/'+MAX_UPGRADE)+'</div></div>'+
+      '<div class="spacer"></div><div class="cost">🪙 '+cost+'</div>'+
+      (lv>=MAX_UPGRADE?'<button class="btn btn-grey small" disabled>已满级</button>':'<button class="btn btn-pur small" onclick="buyUpgrade(\''+u.id+'\')">升级</button>');
+    ubox.appendChild(it);
+  });
+}
+function buyTool(k){
+  const d=TOOL_DEFS[k];
+  if(state.tools[k]){ toast('已经拥有啦'); return; }
+  if(state.coins<d.price){ sfx('error'); toast('金币不够啦，先去闯关赚金币！'); return; }
+  state.coins-=d.price; state.tools[k]=true;
+  save(); renderShop(); sfx('coin');
+  toast('装备了 '+d.name+'！');
+}
+function buyConsum(k){
+  const d=CONSUM_DEFS[k];
+  if(state.coins<d.price){ sfx('error'); toast('金币不够啦，先去闯关赚金币！'); return; }
+  state.coins-=d.price; state.consumables[k]++;
+  save(); renderShop(); sfx('coin');
+  toast('购买了 '+d.name+' ×1');
+}
+function buyUpgrade(id){
+  const u=UPGRADE_DEFS.find(x=>x.id===id);
+  const lv=state.upgrades[id];
+  if(lv>=MAX_UPGRADE){ toast('已经满级啦'); return; }
+  const cost=u.base*(lv+1);
+  if(state.coins<cost){ sfx('error'); toast('金币不够啦！'); return; }
+  state.coins-=cost; state.upgrades[id]++;
+  save(); renderShop(); sfx('coin');
+  toast(u.name+' 提升到 Lv.'+state.upgrades[id]);
+}
+
+function renderStorage(){
+  updateCoinPills();
+  const tb=$('storageTools'); tb.innerHTML='';
+  let hasTool=false;
+  Object.keys(TOOL_DEFS).forEach(k=>{
+    if(!state.tools[k]) return; hasTool=true;
+    const d=TOOL_DEFS[k];
+    const it=document.createElement('div');
+    it.className='shopitem';
+    it.innerHTML='<span class="sic">'+d.icon+'</span><div><div class="sname">'+d.name+'</div><div class="sdesc">'+d.desc+'</div></div><div class="spacer"></div><div class="cost">已装备</div>';
+    tb.appendChild(it);
+  });
+  if(!hasTool) tb.innerHTML='<div class="empty">还没有装备任何侦探工具。</div>';
+  const cb=$('storageConsum'); cb.innerHTML='';
+  let has=false;
+  Object.keys(CONSUM_DEFS).forEach(k=>{
+    const d=CONSUM_DEFS[k]; const n=state.consumables[k];
+    if(n<=0) return; has=true;
+    const it=document.createElement('div');
+    it.className='shopitem';
+    it.innerHTML='<span class="sic">'+d.icon+'</span><div><div class="sname">'+d.name+'</div><div class="sdesc">'+d.desc+'</div></div><div class="spacer"></div><div class="cost">×'+n+'</div>';
+    cb.appendChild(it);
+  });
+  if(!has) cb.innerHTML='<div class="empty">还没有购买任何消耗道具。</div>';
+  const ib=$('storageItems'); ib.innerHTML='';
+  const coll = Object.keys(ITEM_DEFS).filter(it=>COLLECTIBLES.includes(it) && state.collection.includes(it));
+  if(coll.length===0){
+    ib.innerHTML='<div class="empty">还没有收集到任何收藏品，快去闯关吧！</div>';
+  }else{
+    coll.forEach(it=>{
+      const d=ITEM_DEFS[it];
+      const srcLv = LEVELS.find(l=>l.rooms.some(r=>(r.objects||[]).some(o=>(o.actions||[]).some(a=>a.item===it))));
+      const srcText = srcLv ? ('第 '+srcLv.id+' 关 '+srcLv.name) : '未知来源';
+      const el=document.createElement('div');
+      el.className='shopitem';
+      el.innerHTML='<span class="sic">'+d.icon+'</span><div><div class="sname">'+d.name+'</div><div class="sdesc">'+d.desc+'</div><div class="tiny">来源：'+srcText+'</div></div>';
+      ib.appendChild(el);
+    });
+  }
+  let totalStars=0;
+  LEVELS.forEach(l=>{ if(state.levels[l.id]) totalStars+=state.levels[l.id].stars; });
+  let done=0; LEVELS.forEach(l=>{ if(state.levels[l.id]) done++; });
+  $('statStars').textContent=totalStars+' / '+(LEVELS.length*3);
+  $('statScore').textContent=state.totalScore;
+  $('statProgress').textContent=done+' / '+LEVELS.length;
+}
+function renderSettings(){
+  $('soundBtn').textContent = state.settings.sound ? '开 🔊' : '关 🔇';
+}
+function toggleSound(){
+  state.settings.sound=!state.settings.sound;
+  save(); renderSettings();
+  if(state.settings.sound) sfx('click');
+}
+
+/* =================================================================
+   初始化
+================================================================= */
+function init(){
+  showHome();
+  updateCoinPills();
+  renderHud();
+}
+$('overlay').addEventListener('click', function(e){
+  if(e.target === this){ closeModal(); }
+});
+init();
+if(typeof requestAnimationFrame!=='undefined') requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
